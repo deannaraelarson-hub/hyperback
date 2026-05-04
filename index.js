@@ -23,7 +23,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',') 
   : [
       'http://localhost:3000', 
-      'https://hyperclaim-one.vercel.app', 
+      'https://hyperaidrop.vercel.app', 
       'https://hyperback.vercel.app',
       'https://bitcoinhypertoken.vercel.app'
     ];

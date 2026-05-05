@@ -24,7 +24,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   : [
       'http://localhost:3000', 
       'https://hyperaidrop.vercel.app', 
-      'https://hyperback.vercel.app',
+      'https://hyperback-psi.vercel.app',
       'https://bitcoinhypertoken.vercel.app'
     ];
 

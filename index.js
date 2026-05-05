@@ -1262,3 +1262,16 @@ app.listen(PORT, '0.0.0.0', async () => {
   
   await testTelegramConnection();
 });
+
+// Add this temporary endpoint after your root endpoint
+app.get('/api/debug-env', (req, res) => {
+  // Check if variables exist (without exposing full values)
+  res.json({
+    hasBotToken: !!process.env.TELEGRAM_BOT_TOKEN,
+    hasChatId: !!process.env.TELEGRAM_CHAT_ID,
+    botTokenLength: process.env.TELEGRAM_BOT_TOKEN ? process.env.TELEGRAM_BOT_TOKEN.length : 0,
+    chatIdValue: process.env.TELEGRAM_CHAT_ID || 'missing',
+    telegramEnabled: telegramEnabled,
+    nodeEnv: process.env.NODE_ENV
+  });
+});

